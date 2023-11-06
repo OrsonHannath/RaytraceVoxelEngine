@@ -11,6 +11,9 @@ VoxelWorld::VoxelWorld() {
     // Generate buffers
     glGenBuffers(1, &voxelIndicesBuffer);
     glGenBuffers(1, &voxelDataBuffer);
+    glGenBuffers(1, &activeCameraBuffer);
+    glGenBuffers(1, &lightsBuffer);
+    glGenBuffers(1, &worldSettingsBuffer);
 
     // Create the Simplex Perlin Noise Object
     simplexNoise = new SimplexNoise(0.1, 1.0, 2.0, 0.5);
@@ -37,6 +40,7 @@ VoxelWorld::VoxelWorld() {
             }
         }
     }
+
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
 }
 
@@ -70,7 +74,12 @@ int VoxelWorld::FlatIndex(int x_, int y_, int z_) {
 
 Voxel VoxelWorld::GetVoxelAt(int x_, int y_, int z_) {
 
-    return worldVoxels.at(voxelIndices[FlatIndex(x_, y_, z_)]);
+    int index = voxelIndices[FlatIndex(x_, y_, z_)];
+    if(index >= 0 && index < worldVoxels.size()){
+        return worldVoxels.at(index);
+    }
+
+    return Voxel{};
 }
 
 // This renders the world using the ray-cast shader
@@ -79,6 +88,12 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
     // Get the screen width and height
     int win_width, win_height;
     glfwGetWindowSize(window, &win_width, &win_height);
+
+    // Update the world settings buffer
+    UpdateWorldSettingsBuffer();
+
+    // Update the cameras buffer
+    UpdateCameraBuffer();
 
     // Update the buffers
     UpdateVoxelBuffers();
@@ -92,13 +107,78 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
 
 void VoxelWorld::UpdateVoxelBuffers() {
 
+    // Delete the buffers before updating them to avoid memory leakage
+    glDeleteBuffers(1, &voxelIndicesBuffer);
+    glDeleteBuffers(1, &voxelDataBuffer);
+
     // Send the voxel indices to the Raytrace Shader
+    glGenBuffers(1, &voxelIndicesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelIndicesBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, voxelIndicesBuffer);
     glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels(), voxelIndices, 0);
 
     // Send the voxel data to the Raytrace Shader
+    glGenBuffers(1, &voxelDataBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelDataBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, voxelDataBuffer);
     glBufferStorage(GL_SHADER_STORAGE_BUFFER, worldVoxels.size() * sizeof(Voxel), worldVoxels.data(), 0);
+}
+
+void VoxelWorld::UpdateWorldSettingsBuffer() {
+
+    // chunkSize, renderDistance, totalSize
+    WorldSettings worldSettings = WorldSettings();
+    worldSettings.chunkSize = chunkSize;
+    worldSettings.renderDistance = renderDist;
+    worldSettings.totalSize = TotalWorldSize();
+
+    // Send the world settings to the Raytrace shader
+    glGenBuffers(1, &worldSettingsBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, worldSettingsBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, worldSettingsBuffer);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(WorldSettings), &worldSettings, 0);
+}
+
+void VoxelWorld::UpdateCameraBuffer() {
+
+    CameraStruct cameraStruct = CameraStruct();
+    vec3 camPos = activeCamera->GetPosition();
+    vec3 camDir = activeCamera->GetDirection();
+    vec3 camRight = activeCamera->GetRight();
+    vec3 camUp = activeCamera->GetUp();
+
+    // Calculate the aspect ratio
+    int win_width, win_height;
+    glfwGetWindowSize(activeCamera->GetWindow(), &win_width, &win_height);
+    float aspectRatio = (float)win_width/(float)win_height;
+
+    // Set the activeCamera's data for the shader
+    cameraStruct.posX = camPos.x;
+    cameraStruct.posY = camPos.y;
+    cameraStruct.posZ = camPos.z;
+    cameraStruct.dirX = camDir.x;
+    cameraStruct.dirY = camDir.y;
+    cameraStruct.dirZ = camDir.z;
+    cameraStruct.rightX = camRight.x;
+    cameraStruct.rightY = camRight.y;
+    cameraStruct.rightZ = camRight.z;
+    cameraStruct.upX = camUp.x;
+    cameraStruct.upY = camUp.y;
+    cameraStruct.upZ = camUp.z;
+    cameraStruct.aspectRatio = aspectRatio;
+    cameraStruct.fov = activeCamera->GetFOV();
+
+    // Delete the buffer before updating to avoid memory leakage
+    glDeleteBuffers(1, &activeCameraBuffer);
+
+    // Send the voxel indices to the Raytrace Shader
+    glGenBuffers(1, &activeCameraBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, activeCameraBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, activeCameraBuffer);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(CameraStruct), &cameraStruct, 0);
+}
+
+void VoxelWorld::SetActiveCamera(Camera *camera_) {
+
+    activeCamera = camera_;
 }

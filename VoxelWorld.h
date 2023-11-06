@@ -11,6 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <map>
+#include "Camera.h"
 #include "SRombauts/SimplexNoise.h"
 #include "DeltaTime/DeltaTime.h"
 
@@ -22,11 +23,18 @@ struct Voxel{
     }
 };
 
+struct WorldSettings{
+
+    int chunkSize;
+    int renderDistance;
+    int totalSize;
+};
+
 class VoxelWorld {
 private:
     SimplexNoise* simplexNoise;
 
-    static const int chunkSize = 32; // Number of voxels in a chunk
+    static const int chunkSize = 64; // Number of voxels in a chunk
     int renderDist = 2; // Number of chunks rendered at once
 
     std::vector<Voxel> worldVoxels; // A Vector that stores all the voxels that are in the world
@@ -34,6 +42,11 @@ private:
 
     GLuint voxelDataBuffer;
     GLuint voxelIndicesBuffer;
+    GLuint activeCameraBuffer;
+    GLuint lightsBuffer;
+    GLuint worldSettingsBuffer;
+
+    Camera* activeCamera;
 public:
     VoxelWorld();
     ~VoxelWorld();
@@ -46,8 +59,12 @@ public:
     int TotalWorldSize() const; // Returns the total size of the world i.e. chunkSize * renderDist
     int FlatIndex(int x_, int y_, int z_); // Returns a flattened index from a 3D position
 
+    void UpdateWorldSettingsBuffer(); // Updates the world settings buffer
+    void UpdateCameraBuffer(); // Updates the camera buffers
     void UpdateVoxelBuffers(); // Updates the voxel data buffers
     void RenderWorld(GLFWwindow* window, std::map<std::string, GLuint> GLHandles); // Used to run the raytracing to render the world
+
+    void SetActiveCamera(Camera* camera_);
 };
 
 

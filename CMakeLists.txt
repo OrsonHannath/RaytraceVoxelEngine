@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AdvancedVoxelEngine)
+project(RaytraceVoxelEngine)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -43,6 +43,6 @@ include_directories(${GLM_INCLUDE_DIR}) # include_directories(${VAR_NAME}) *used
 link_directories(${GLEW_LIB_DIR}) # link_directories(${VAR_NAME}) *used for dll/binary/lib files*
 link_directories(${GLFW_LIB_DIR}) # link_directories(${VAR_NAME}) *used for dll/binary/lib files*
 
-add_executable(AdvancedVoxelEngine main.cpp OpenGLApp.h OpenGLApp.cpp Scene.h Scene.cpp SceneManager.h SceneManager.cpp ShaderProgram.h ShaderProgram.cpp ShaderProgramHandler.h ShaderProgramHandler.cpp assets/scenes/VoxelWorldScene.h assets/scenes/VoxelWorldScene.cpp libraries/Custom/DeltaTime/DeltaTime.h libraries/Custom/DeltaTime/DeltaTime.cpp assets/shader_program_handlers/TestingShaderProgramHandler.h assets/shader_program_handlers/TestingShaderProgramHandler.cpp libraries/Custom/Vector3/Vector3.h VoxelWorld.cpp VoxelWorld.h libraries/SRombauts/SimplexNoise.cpp libraries/SRombauts/SimplexNoise.h)
+add_executable(RaytraceVoxelEngine main.cpp OpenGLApp.h OpenGLApp.cpp Scene.h Scene.cpp SceneManager.h SceneManager.cpp ShaderProgram.h ShaderProgram.cpp ShaderProgramHandler.h ShaderProgramHandler.cpp assets/scenes/VoxelWorldScene.h assets/scenes/VoxelWorldScene.cpp libraries/Custom/DeltaTime/DeltaTime.h libraries/Custom/DeltaTime/DeltaTime.cpp assets/shader_program_handlers/TestingShaderProgramHandler.h assets/shader_program_handlers/TestingShaderProgramHandler.cpp libraries/Custom/Vector3/Vector3.h VoxelWorld.cpp VoxelWorld.h libraries/SRombauts/SimplexNoise.cpp libraries/SRombauts/SimplexNoise.h Camera.cpp Camera.h)
 
 target_link_libraries(${PROJECT_NAME} glfw3 glew32 opengl32 -static-libgcc -static-libstdc++) # Link the libraries to the project
