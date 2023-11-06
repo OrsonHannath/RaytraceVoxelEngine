@@ -72,7 +72,7 @@ int FlatIndex(int x, int y, int z){
         return -1;
     }
 
-    return (z * worldSettings[0].totalSize * worldSettings[0].totalSize) + (y * worldSettings[0].totalSize) + x;
+    return x + worldSettings[0].totalSize * (y + worldSettings[0].totalSize * z);
 }
 
 int GetVoxelIndex(int x, int y, int z){
@@ -188,7 +188,8 @@ void main() {
         // Check if there is a voxel at the position
         if(IsVoxelAt(int(pos.x), int(pos.y), int(pos.z))){
 
-            pixel = vec4(GetVoxelAt(int(pos.x), int(pos.y), int(pos.z)).type / 255.0, GetVoxelAt(int(pos.x), int(pos.y), int(pos.z)).type / 255.0, GetVoxelAt(int(pos.x), int(pos.y), int(pos.z)).type / 255.0, 1);
+            Voxel vox = GetVoxelAt(int(pos.x), int(pos.y), int(pos.z));
+            pixel = vec4(vox.type / 255.0, vox.type / 255.0, vox.type / 255.0, 1);
             break;
         }
     }

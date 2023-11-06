@@ -69,7 +69,7 @@ int VoxelWorld::TotalWorldSize() const {
 
 int VoxelWorld::FlatIndex(int x_, int y_, int z_) {
 
-    return (z_ * TotalWorldSize() * TotalWorldSize()) + (y_ * TotalWorldSize()) + x_;
+    return x_ + TotalWorldSize() * (y_ + TotalWorldSize() * z_);
 }
 
 Voxel VoxelWorld::GetVoxelAt(int x_, int y_, int z_) {
@@ -115,7 +115,7 @@ void VoxelWorld::UpdateVoxelBuffers() {
     glGenBuffers(1, &voxelIndicesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelIndicesBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, voxelIndicesBuffer);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels(), voxelIndices, 0);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels() * sizeof(int), voxelIndices, 0);
 
     // Send the voxel data to the Raytrace Shader
     glGenBuffers(1, &voxelDataBuffer);
