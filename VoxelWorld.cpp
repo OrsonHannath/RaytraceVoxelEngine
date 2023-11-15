@@ -8,6 +8,9 @@ VoxelWorld::VoxelWorld() {
 
     std::cout << "--- Creating Voxel World ---" << std::endl;
 
+    // Create the sparse voxel octree
+    sparseVoxelOctree = new SparseVoxelOctree(1, 12);
+
     // Generate buffers
     glGenBuffers(1, &voxelIndicesBuffer);
     glGenBuffers(1, &voxelDataBuffer);
@@ -37,6 +40,10 @@ VoxelWorld::VoxelWorld() {
 
                 int voxelIndex = (int)worldVoxels.size() - 1;
                 voxelIndices[FlatIndex(x, y, z)] = voxelIndex;
+
+                // Sparse Voxel Octree Insertions
+                VoxelData voxelData = {voxelType};
+                sparseVoxelOctree->Insert(fVec3(x, y, z), voxelData);
             }
         }
     }

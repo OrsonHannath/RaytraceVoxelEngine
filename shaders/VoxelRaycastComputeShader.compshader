@@ -30,6 +30,11 @@ struct Light{
     bool global;
 };
 
+struct RayHit{
+    bool hit;
+    float distance;
+};
+
 // Pass in Camera Information
 layout(binding = 1) buffer camera_data {
 
@@ -116,6 +121,33 @@ Voxel GetVoxelAt(int x, int y, int z){
     return Voxel(-1);
 }
 
+// https://tavianator.com/2022/ray_box_boundary.html
+RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float octantScale){
+
+    // Calculate the voxels bounding positions, i.e., two opposing corners of the voxel
+    vec3 voxelMin = voxelPosition;
+    vec3 voxelMax = voxelPosition + vec3(octantScale);
+
+    vec3 invRayDirection = 1.0 / rayDirection;
+
+    float tmin = 0.0, tmax = (1.0/0.0);
+
+    for (int d = 0; d < 3; ++d) {
+        float t1 = (voxelMin[d] - rayOrigin[d]) * invRayDirection[d];
+        float t2 = (voxelMax[d] - rayOrigin[d]) * invRayDirection[d];
+
+        tmin = max(tmin, min(t1, t2));
+        tmax = min(tmax, max(t1, t2));
+    }
+
+    RayHit rayHit = {false, 0};
+    if(tmin < tmax){
+        rayHit.hit = true;
+        rayHit.distance = tmin;
+    }
+    return rayHit;
+}
+
 void main() {
 
     // Set a default pixel color and obtain pixel coordinates
@@ -147,51 +179,63 @@ void main() {
     // Calculate the point on the screen in the world space
     vec3 ray_o = cam_o;
 
-    // Raycasting
-    vec3 pos = floor(ray_o);
-    vec3 step = sign(ray_d);
-    vec3 tDelta = step / ray_d;
-    float tMaxX, tMaxY, tMaxZ;
-    vec3 fr = fract(ray_o);
+    // The positional relationship of each child in the octree
+    vec3 childRelations[] = {vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), vec3(0,1,1), vec3(1,0,0), vec3(1,0,1), vec3(1,1,0), vec3(1,1,1)};
 
-    tMaxX = tDelta.x * ((ray_d.x>0.0) ? (1.0 - fr.x) : fr.x);
-    tMaxY = tDelta.y * ((ray_d.y>0.0) ? (1.0 - fr.y) : fr.y);
-    tMaxZ = tDelta.z * ((ray_d.z>0.0) ? (1.0 - fr.z) : fr.z);
+    // Variables to hold the child that was hit closest
+    float minHitDistance = (1.0/0.0);
+    int minHitChild = -1;
+    bool intersectFound = false;
 
-    vec3 norm;
-    const int maxTrace = 1000;
+    int hitcount = 0;
 
-    for (int i = 0; i < maxTrace; i++) {
+    // Check for intersection of the ray within the octree
+    int scale = 16;
+    int octreeDepth = 8; // The maximum depth of the octree (should be set as a buffer object)
+    vec3 parentVoxelPosition = vec3(0, 0, 0);
+    for(int i = 0; i < octreeDepth; i++){
 
-        if (tMaxX < tMaxY) {
-            if (tMaxZ < tMaxX) {
-                tMaxZ += tDelta.z;
-                pos.z += step.z;
-                norm = vec3(0, 0,-step.z);
-            } else {
-                tMaxX += tDelta.x;
-                pos.x += step.x;
-                norm = vec3(-step.x, 0, 0);
-            }
-        } else {
-            if (tMaxZ < tMaxY) {
-                tMaxZ += tDelta.z;
-                pos.z += step.z;
-                norm = vec3(0, 0, -step.z);
-            } else {
-                tMaxY += tDelta.y;
-                pos.y += step.y;
-                norm = vec3(0, -step.y, 0);
+        // Hit this octant
+        bool octantHit = false;
+
+        // The scale of the octant at this position
+        float octantScale = scale * (1/pow(2, i));
+
+        // Check if the ray will intersect with any of the child voxels
+        for(int j = 0; j < 8; j++){
+
+            vec3 voxelPosition = parentVoxelPosition + (childRelations[j] * octantScale);  // Voxel is located at the origin
+            RayHit rayHit = RayIntersect(ray_o, ray_d, voxelPosition, octantScale);
+
+            // Update the parent voxels position to be that of the hit voxel
+            if(rayHit.hit){
+
+                // If this is the first hit for this octant then reset the minimum values
+                if(!octantHit){
+                    octantHit = true;
+                    minHitDistance = (1.0/0.0);
+                    minHitChild = -1;
+                    intersectFound = false;
+                }
+
+                if(rayHit.distance < minHitDistance){
+                    minHitDistance = rayHit.distance;
+                    minHitChild = j;
+                    intersectFound = true;
+                }
+
+                hitcount = hitcount + 1;
             }
         }
 
-        // Check if there is a voxel at the position
-        if(IsVoxelAt(int(pos.x), int(pos.y), int(pos.z))){
-
-            Voxel vox = GetVoxelAt(int(pos.x), int(pos.y), int(pos.z));
-            pixel = vec4(vox.type / 255.0, vox.type / 255.0, vox.type / 255.0, 1);
-            break;
+        if(octantHit){
+            parentVoxelPosition = parentVoxelPosition + (childRelations[minHitChild] * octantScale);
         }
+    }
+
+    if(intersectFound){
+        // Render the closest hit child
+        pixel = vec4(hitcount/40.0);
     }
 
     imageStore(screen, pixel_coords, pixel);
