@@ -22,7 +22,7 @@ private:
     SimplexNoise* simplexNoise;
 
     // The depth of the voxel octree
-    int octreeDepth = 2;
+    int octreeDepth = 3;
 
     // The scale of the world (the largest voxel)
     int worldScale = 16;

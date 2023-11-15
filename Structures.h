@@ -9,6 +9,7 @@
 
 struct Voxel{
     int type;
+    bool terminal;
 
     std::string toString(){
         return std::to_string(type);

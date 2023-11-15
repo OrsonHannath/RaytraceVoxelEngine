@@ -179,6 +179,7 @@ void main() {
     if(intersectFound){
         // Render the closest hit child
         pixel = vec4(hitcount/40.0);
+        //pixel = vec4(parentVoxelPosition.x/float(scale*2), parentVoxelPosition.y/float(scale*2), parentVoxelPosition.z/float(scale*2), 1);
     }
 
     imageStore(screen, pixel_coords, pixel);

@@ -86,3 +86,19 @@ void VoxelOctree::FlattenOctree(Node *node, std::vector<Voxel> &voxelsVector) {
         FlattenOctree(node->children[i], voxelsVector);
     }
 }
+
+void VoxelOctree::GetChildNodes(std::vector<Voxel>& flattenedNodes, int parentIndex, int targetDepth, std::vector<Voxel>& childNodes, std::vector<int>& indices) {
+
+    // Calculate the number of nodes between each of the target nodes
+    int dist = 0;
+    for(int i = 0; i < m_MaxDepth - targetDepth; i++){
+
+        dist += pow(8, i);
+    }
+
+    // Find the nodes within the flattenedNodes vector and push them to the childNodes vector
+    for(int i = 0; i < 8; i++){
+        indices.push_back((parentIndex + 1) + (dist * i));
+        childNodes.push_back(flattenedNodes.at((parentIndex + 1) + (dist * i)));
+    }
+}

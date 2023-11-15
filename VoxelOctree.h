@@ -16,6 +16,7 @@ public:
     VoxelOctree(int size, int maxDepth);
     void Insert(fVec3 point, Voxel voxData_);
     void FlattenOctree(std::vector<Voxel>& voxelsVector);
+    void GetChildNodes(std::vector<Voxel>& flattenedNodes, int parentIndex, int targetDepth, std::vector<Voxel>& childNodes, std::vector<int>& indices);
 
 private:
     void Insert(Node **node, fVec3 point, Voxel voxData_, iVec3 position, int depth);

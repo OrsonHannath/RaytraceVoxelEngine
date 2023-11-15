@@ -38,7 +38,7 @@ VoxelWorld::VoxelWorld() {
                 voxelIndices[FlatIndex(x, y, z)] = voxelIndex;
 
                 // Sparse Voxel Octree Insertions
-                Voxel voxelData = {voxelType};
+                Voxel voxelData = {voxelType, true};
                 voxelOctree->Insert(fVec3(x, y, z), voxelData);
             }
         }
@@ -47,8 +47,17 @@ VoxelWorld::VoxelWorld() {
     // Update the worldVoxels
     voxelOctree->FlattenOctree(worldVoxels);
 
-    for(Voxel vox : worldVoxels){
-        std::cout << vox.type << std::endl;
+    // Get the nodes at a depth of 0
+    std::vector<Voxel> childNodes;
+    std::vector<int> indices;
+    voxelOctree->GetChildNodes(worldVoxels, 0, 0, childNodes, indices);
+
+    for(int i : indices){
+        std::cout << i << std::endl;
+    }
+
+    for(Voxel vox : childNodes){
+        std::cout << vox.type << ", " << vox.terminal << std::endl;
     }
 
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
