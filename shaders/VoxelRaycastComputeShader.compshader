@@ -8,9 +8,8 @@ struct Voxel{
 };
 
 struct WorldSettings{
-    int chunkSize;
-    int renderDistance;
-    int totalSize;
+    int octreeDepth;
+    int worldScale;
 };
 
 struct Camera{
@@ -64,62 +63,6 @@ layout(binding = 5) buffer world_settings {
 
     WorldSettings worldSettings[];
 };
-
-int FlatIndex(int x, int y, int z){
-
-    // Make sure in bounds positive
-    if(x >= worldSettings[0].totalSize || y >= worldSettings[0].totalSize || z >= worldSettings[0].totalSize){
-        return -1;
-    }
-
-    // Makes sure in bounds negative
-    if(x < 0 || y < 0 || z < 0){
-        return -1;
-    }
-
-    return x + worldSettings[0].totalSize * (y + worldSettings[0].totalSize * z);
-}
-
-int GetVoxelIndex(int x, int y, int z){
-
-    int index = FlatIndex(x, y, z);
-    if(index >= 0 && index < voxel_indices.length()){
-
-        return voxel_indices[FlatIndex(x, y, z)];
-    }
-
-    return -1;
-}
-
-bool IsAirVoxel(int x, int y, int z){
-
-    if(world_voxels[GetVoxelIndex(x, y, z)].type == 0){
-        return true;
-    }
-
-    return false;
-}
-
-bool IsVoxelAt(int x, int y, int z){
-
-    // Check if there is a voxel at the given coordinates
-    if(GetVoxelIndex(x, y, z) != -1 && !IsAirVoxel(x, y, z)){
-
-        return true;
-    }
-
-    return false;
-}
-
-Voxel GetVoxelAt(int x, int y, int z){
-
-    if(IsVoxelAt(x, y, z)){
-
-        return world_voxels[GetVoxelIndex(x, y, z)];
-    }
-
-    return Voxel(-1);
-}
 
 // https://tavianator.com/2022/ray_box_boundary.html
 RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float octantScale){
@@ -190,8 +133,8 @@ void main() {
     int hitcount = 0;
 
     // Check for intersection of the ray within the octree
-    int scale = 16;
-    int octreeDepth = 8; // The maximum depth of the octree (should be set as a buffer object)
+    int scale = worldSettings[0].worldScale;
+    int octreeDepth = worldSettings[0].octreeDepth; // The maximum depth of the octree (should be set as a buffer object)
     vec3 parentVoxelPosition = vec3(0, 0, 0);
     for(int i = 0; i < octreeDepth; i++){
 

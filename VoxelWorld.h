@@ -11,37 +11,26 @@
 #include <vector>
 #include <cmath>
 #include <map>
-#include "SparseVoxelOctree.h"
+#include "VoxelOctree.h"
 #include "Camera.h"
 #include "SRombauts/SimplexNoise.h"
 #include "DeltaTime/DeltaTime.h"
-
-struct Voxel{
-    int type;
-
-    std::string toString(){
-        return std::to_string(type);
-    }
-};
-
-struct WorldSettings{
-
-    int chunkSize;
-    int renderDistance;
-    int totalSize;
-};
+#include "Structures.h"
 
 class VoxelWorld {
 private:
     SimplexNoise* simplexNoise;
 
-    static const int chunkSize = 16; // Number of voxels in a chunk
-    int renderDist = 1; // Number of chunks rendered at once
+    // The depth of the voxel octree
+    int octreeDepth = 2;
+
+    // The scale of the world (the largest voxel)
+    int worldScale = 16;
 
     std::vector<Voxel> worldVoxels; // A Vector that stores all the voxels that are in the world
     int* voxelIndices; // An array that stores all voxel indexes of size chunkSize^3 * renderDist^3
 
-    SparseVoxelOctree* sparseVoxelOctree; // The SparseVoxelOctree for the voxels
+    VoxelOctree* voxelOctree; // The SparseVoxelOctree for the voxels
 
     GLuint voxelDataBuffer;
     GLuint voxelIndicesBuffer;
@@ -53,9 +42,6 @@ private:
 public:
     VoxelWorld();
     ~VoxelWorld();
-
-    void UpdateVoxelIndices(); // Updates the Voxel Indices Array so that it is the correct size
-    void SetRenderDistance(int renderDist_); // Updates the Render Distance
 
     Voxel GetVoxelAt(int x_, int y_, int z_); // Returns the voxel from the voxel vector based on the flat index in voxel indices
     int TotalVoxels() const; // Returns the total number of voxels in the rendered world
