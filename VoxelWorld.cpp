@@ -93,6 +93,9 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
     int win_width, win_height;
     glfwGetWindowSize(window, &win_width, &win_height);
 
+    // Update the lights buffer
+    UpdateLightsBuffer();
+
     // Update the world settings buffer
     UpdateWorldSettingsBuffer();
 
@@ -139,10 +142,24 @@ void VoxelWorld::UpdateVoxelBuffers() {
     }
 }
 
+void VoxelWorld::UpdateLightsBuffer() {
+
+    // Delete the buffers before updating them to avoid memory leakage
+    glDeleteBuffers(1, &lightsBuffer);
+
+    // Send the voxel indices to the Raytrace Shader
+    glGenBuffers(1, &lightsBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, lightsBuffer);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sceneLights.size() * sizeof(Light), sceneLights.data(), GL_DYNAMIC_STORAGE_BIT); // GL_DYNAMIC_STORAGE_BIT necessary if wanting to mutate the buffer
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
+}
+
 void VoxelWorld::UpdateWorldSettingsBuffer() {
 
     // chunkSize, renderDistance, totalSize
     WorldSettings worldSettings = WorldSettings();
+    worldSettings.numberOfLights = sceneLights.size();
     worldSettings.renderDistance = renderDistance;
     worldSettings.chunkSize = chunkSize;
     worldSettings.totalSize = TotalWorldSize();
@@ -203,4 +220,9 @@ void VoxelWorld::SetActiveCamera(Camera *camera_) {
 void VoxelWorld::SetRaytraceProgram(GLuint programID) {
 
     raytraceProgram = programID;
+}
+
+void VoxelWorld::AddLight(Light light) {
+
+    sceneLights.push_back(light);
 }
