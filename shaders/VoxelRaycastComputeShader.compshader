@@ -5,6 +5,8 @@ layout(rgba32f, binding = 0) uniform image2D screen;
 // Custom Structures
 struct Voxel{
     int type;
+    bool terminal;
+    bool hasChildren;
 };
 
 struct WorldSettings{
@@ -32,6 +34,10 @@ struct Light{
 struct RayHit{
     bool hit;
     float distance;
+};
+
+struct VoxelChildren{
+    Voxel voxels[8];
 };
 
 // Pass in Camera Information
@@ -63,6 +69,54 @@ layout(binding = 5) buffer world_settings {
 
     WorldSettings worldSettings[];
 };
+
+VoxelChildren GetChildVoxels(int parentIndex, int targetDepth) {
+
+    VoxelChildren voxChildren;
+
+    // Calculate the number of nodes between each of the target nodes
+    int dist = 0;
+    for(int i = 0; i < worldSettings[0].octreeDepth - targetDepth; i++){
+
+        dist += pow(8, i);
+    }
+
+    // Find the nodes within the flattenedNodes vector and push them to the childNodes vector
+    for(int i = 0; i < 8; i++){
+
+        int childVoxelIndex = (parentIndex + 1) + (dist * i);
+        voxChildren.voxels[i] = world_voxels[childVoxelIndex];
+    }
+
+    return voxChildren;
+}
+
+Voxel GetVoxel(int index){
+
+    Voxel voxel;
+    voxel.type = -999;
+
+    if(index < pow(8, worldSettings[0].octreeDepth) && index >= 0){
+
+        return world_voxels[index];
+    }
+
+    return voxel;
+}
+
+bool IsVoxel(Voxel voxel){
+
+    if(voxel.type == -999){
+        return false;
+    }
+
+    return true;
+}
+
+bool ShouldCheckChildren(Voxel voxel){
+
+    return voxel.hasChildren;
+}
 
 // https://tavianator.com/2022/ray_box_boundary.html
 RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float octantScale){
@@ -122,6 +176,10 @@ void main() {
     // Calculate the point on the screen in the world space
     vec3 ray_o = cam_o;
 
+    // Settings set in the VoxelWorld header file
+    int scale = worldSettings[0].worldScale;
+    int octreeDepth = worldSettings[0].octreeDepth;
+
     // The positional relationship of each child in the octree
     vec3 childRelations[] = {vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), vec3(0,1,1), vec3(1,0,0), vec3(1,0,1), vec3(1,1,0), vec3(1,1,1)};
 
@@ -129,13 +187,15 @@ void main() {
     float minHitDistance = (1.0/0.0);
     int minHitChild = -1;
     bool intersectFound = false;
+    bool haveChildren = false;
 
-    int hitcount = 0;
+
+    // Need to implement the octree raytracing using the word_voxels
+
 
     // Check for intersection of the ray within the octree
-    int scale = worldSettings[0].worldScale;
-    int octreeDepth = worldSettings[0].octreeDepth; // The maximum depth of the octree (should be set as a buffer object)
     vec3 parentVoxelPosition = vec3(0, 0, 0);
+    int hitcount = 0;
     for(int i = 0; i < octreeDepth; i++){
 
         // Hit this octant
@@ -152,6 +212,8 @@ void main() {
 
             // Update the parent voxels position to be that of the hit voxel
             if(rayHit.hit){
+
+                // Get the index of this voxel
 
                 // If this is the first hit for this octant then reset the minimum values
                 if(!octantHit){

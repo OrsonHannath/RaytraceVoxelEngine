@@ -8,22 +8,16 @@
 #include <string>
 
 struct Voxel{
-    int type;
-    bool terminal;
-
-    std::string toString(){
-        return std::to_string(type);
-    }
+    int type = -1;
+    int terminal = false; // 0 or 1 i.e. true or false
+    int hasChildren = false; // 0 or 1 i.e. true or false
 };
 
 struct WorldSettings{
 
     int octreeDepth;
     int worldScale;
-};
-
-struct VoxelData{
-    int voxelType; // A type in the range of 0-255
+    int totalOctants;
 };
 
 struct Node {
@@ -33,7 +27,7 @@ struct Node {
 
     Node(){
         terminal = false;
-        voxelData = {-1};
+        voxelData = {-1, false, false};
         for(int i = 0; i < 8; i++){
             children[i] = nullptr;
         }
@@ -58,6 +52,14 @@ struct fVec3{
         y = y_;
         z = z_;
     }
+};
+
+struct CS_StackEntry{
+    int depth;
+    int index;
+    int x;
+    int y;
+    int z;
 };
 
 #endif //RAYTRACEVOXELENGINE_STRUCTURES_H

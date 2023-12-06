@@ -37,6 +37,7 @@ private:
     GLuint activeCameraBuffer;
     GLuint lightsBuffer;
     GLuint worldSettingsBuffer;
+    GLuint octreeStackBuffer;
 
     Camera* activeCamera;
 public:
@@ -44,13 +45,14 @@ public:
     ~VoxelWorld();
 
     Voxel GetVoxelAt(int x_, int y_, int z_); // Returns the voxel from the voxel vector based on the flat index in voxel indices
-    int TotalVoxels() const; // Returns the total number of voxels in the rendered world
+    int TotalOctants() const; // Returns the total number of voxels in the rendered world
     int TotalWorldSize() const; // Returns the total size of the world i.e. chunkSize * renderDist
     int FlatIndex(int x_, int y_, int z_); // Returns a flattened index from a 3D position
 
     void UpdateWorldSettingsBuffer(); // Updates the world settings buffer
     void UpdateCameraBuffer(); // Updates the camera buffers
     void UpdateVoxelBuffers(); // Updates the voxel data buffers
+    void UpdateStackBuffer(); // Updates the voxel octree stack buffer (empty array of size octreeDepth + 1)
     void RenderWorld(GLFWwindow* window, std::map<std::string, GLuint> GLHandles); // Used to run the raytracing to render the world
 
     void SetActiveCamera(Camera* camera_);

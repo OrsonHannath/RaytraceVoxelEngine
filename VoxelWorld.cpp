@@ -22,8 +22,8 @@ VoxelWorld::VoxelWorld() {
     simplexNoise = new SimplexNoise(0.1, 1.0, 2.0, 0.5);
 
     // Set the Voxel Indices Array
-    voxelIndices = new int[TotalVoxels()]{-1};
-    std::cout << "Initialized Voxel Indices Array" << std::endl;
+    //voxelIndices = new int[TotalOctants()]{-1};
+    //std::cout << "Initialized Voxel Indices Array" << std::endl;
 
     // Instantiate the Voxel World using the SimplexNoise
     double voxelInitStartTime = CurrentTime();
@@ -34,11 +34,12 @@ VoxelWorld::VoxelWorld() {
                 // Determine the voxels type using the simplex noise
                 int voxelType = (int)roundf(simplexNoise->fractal(1, x, y, z) * 255);
 
-                int voxelIndex = (int)worldVoxels.size() - 1;
-                voxelIndices[FlatIndex(x, y, z)] = voxelIndex;
+                //int voxelIndex = (int)worldVoxels.size() - 1;
+                //voxelIndices[FlatIndex(x, y, z)] = voxelIndex;
 
                 // Sparse Voxel Octree Insertions
-                Voxel voxelData = {voxelType, true};
+                bool terminal = voxelType >= 155;
+                Voxel voxelData = {voxelType, terminal, false};
                 voxelOctree->Insert(fVec3(x, y, z), voxelData);
             }
         }
@@ -47,18 +48,20 @@ VoxelWorld::VoxelWorld() {
     // Update the worldVoxels
     voxelOctree->FlattenOctree(worldVoxels);
 
-    // Get the nodes at a depth of 0
+    std::cout << worldVoxels.at(0).hasChildren << std::endl;
+
+    /*// Get the nodes at a depth of 0
     std::vector<Voxel> childNodes;
     std::vector<int> indices;
     voxelOctree->GetChildNodes(worldVoxels, 0, 0, childNodes, indices);
 
-    for(int i : indices){
-        std::cout << i << std::endl;
-    }
+    //for(int i : indices){
+    //    std::cout << i << std::endl;
+    //}
 
     for(Voxel vox : childNodes){
         std::cout << vox.type << ", " << vox.terminal << std::endl;
-    }
+    }*/
 
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
 }
@@ -68,9 +71,14 @@ VoxelWorld::~VoxelWorld() {
     delete[] voxelIndices;
 }
 
-int VoxelWorld::TotalVoxels() const {
+int VoxelWorld::TotalOctants() const {
 
-    return pow(8, octreeDepth);
+    int totalVoxels = 0;
+    for(int i = 0; i < octreeDepth + 1; i++){
+        totalVoxels += pow(8, i);
+    }
+
+    return totalVoxels;
 }
 
 int VoxelWorld::TotalWorldSize() const {
@@ -103,6 +111,9 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
     // Update the world settings buffer
     UpdateWorldSettingsBuffer();
 
+    // Update the voxel stack buffer
+    UpdateStackBuffer();
+
     // Update the cameras buffer
     UpdateCameraBuffer();
 
@@ -119,28 +130,65 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
 void VoxelWorld::UpdateVoxelBuffers() {
 
     // Delete the buffers before updating them to avoid memory leakage
-    glDeleteBuffers(1, &voxelIndicesBuffer);
     glDeleteBuffers(1, &voxelDataBuffer);
 
-    // Send the voxel indices to the Raytrace Shader
+    /*// Send the voxel indices to the Raytrace Shader
+    glDeleteBuffers(1, &voxelIndicesBuffer);
     glGenBuffers(1, &voxelIndicesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelIndicesBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, voxelIndicesBuffer);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels() * sizeof(int), voxelIndices, 0);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalOctants() * sizeof(int), voxelIndices, 0);*/
 
     // Send the voxel data to the Raytrace Shader
     glGenBuffers(1, &voxelDataBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelDataBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, voxelDataBuffer);
     glBufferStorage(GL_SHADER_STORAGE_BUFFER, worldVoxels.size() * sizeof(Voxel), worldVoxels.data(), 0);
+
+
+    GLsizei bufferSize = worldVoxels.size() * sizeof(Voxel);
+    Voxel* voxelDataFromBuffer = new Voxel[worldVoxels.size()];
+
+    /*// Retrieve the voxel data from the GPU
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelDataBuffer);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, bufferSize, voxelDataFromBuffer);
+
+    // Print the contents for inspection
+    for (size_t i = 0; i < worldVoxels.size(); ++i) {
+        std::cout << "Voxel " << i << ": Terminal = " << voxelDataFromBuffer[i].terminal << std::endl;
+        //std::cout << "Voxel " << i << ": Has Children = " << voxelDataFromBuffer[i].hasChildren << std::endl;
+        // Print other voxel members as needed
+    }
+
+    delete[] voxelDataFromBuffer;*/
+}
+
+void VoxelWorld::UpdateStackBuffer() {
+
+    // chunkSize, renderDistance, totalSize
+    int stackSize = 256;
+    CS_StackEntry octreeStack[stackSize];
+    for(int i = 0; i < stackSize; i++){
+        octreeStack[i] = {0, -1, 0, 0, 0};
+    }
+
+    // Send the world settings to the Raytrace shader
+    glGenBuffers(1, &octreeStackBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, octreeStackBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, octreeStackBuffer);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(CS_StackEntry) * stackSize, &octreeStack, 0);
 }
 
 void VoxelWorld::UpdateWorldSettingsBuffer() {
+
+    // Delete the buffers before updating them to avoid memory leakage
+    glDeleteBuffers(1, &worldSettingsBuffer);
 
     // chunkSize, renderDistance, totalSize
     WorldSettings worldSettings = WorldSettings();
     worldSettings.octreeDepth = octreeDepth;
     worldSettings.worldScale = worldScale;
+    worldSettings.totalOctants = TotalOctants();
 
     // Send the world settings to the Raytrace shader
     glGenBuffers(1, &worldSettingsBuffer);
@@ -150,6 +198,9 @@ void VoxelWorld::UpdateWorldSettingsBuffer() {
 }
 
 void VoxelWorld::UpdateCameraBuffer() {
+
+    // Delete the buffers before updating them to avoid memory leakage
+    glDeleteBuffers(1, &activeCameraBuffer);
 
     CameraStruct cameraStruct = CameraStruct();
     vec3 camPos = activeCamera->GetPosition();

@@ -11,7 +11,7 @@ TestingShaderProgramHandler::TestingShaderProgramHandler(){
     AddProgram(mainProgram);
 
     // Create and add the raytrace compute program
-    std::vector<std::string> raycastProgramShaders = {"../shaders/VoxelRaycastComputeShader.compshader"};
+    std::vector<std::string> raycastProgramShaders = {"../shaders/OctreeRaytraceComputeShader.compshader"};
     ShaderProgram* raytraceProgram = new ShaderProgram("RaytraceProgram", raycastProgramShaders);
     AddProgram(raytraceProgram);
 }

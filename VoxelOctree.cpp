@@ -8,7 +8,7 @@ VoxelOctree::VoxelOctree(int size_, int maxDepth_) {
 
     m_Size = size_;
     m_MaxDepth = maxDepth_;
-    m_Root = nullptr;
+    m_Root = new Node();
 }
 
 // https://www.youtube.com/watch?v=NjCp-HIZTcA&ab_channel=Ozown
@@ -22,11 +22,13 @@ void VoxelOctree::Insert(Node **node, fVec3 point, Voxel voxData_, iVec3 positio
 
     // We only create nodes that have values, hence the sparse name
     if (*node == nullptr) {
-        *node = new Node;
+        *node = new Node();
     }
 
     if (depth == m_MaxDepth) {
-        (*node)->terminal = true;
+
+        (*node)->terminal = voxData_.terminal;
+        voxData_.hasChildren = false;
         (*node)->voxelData = voxData_;
         return;
     }
@@ -40,7 +42,9 @@ void VoxelOctree::Insert(Node **node, fVec3 point, Voxel voxData_, iVec3 positio
         which child this point belongs to.
     */
 
-    //(*node)->voxelData = voxData_;
+    (*node)->terminal = false;
+    voxData_.hasChildren = true;
+    (*node)->voxelData = voxData_;
     float size = (1.0f / std::exp2(depth)) * m_Size;
     iVec3 childPos = {
             (int)std::round((point.x - ((float)position.x * size)) / size),

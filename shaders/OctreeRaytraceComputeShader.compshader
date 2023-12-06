@@ -1,0 +1,481 @@
+#version 440 core
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D screen;
+
+#define INF 1.0/0
+
+// Custom Structures
+
+// A BOOL IS 4 BYTES IN GLSL BUT ONLY 1 IN CPP
+struct Voxel{
+    int type;
+    bool terminal;
+    bool hasChildren;
+};
+
+struct WorldSettings{
+    int octreeDepth;
+    int worldScale;
+    int totalOctants;
+};
+
+struct Camera{
+    float posX, posY, posZ;
+    float dirX, dirY, dirZ;
+    float rightX, rightY, rightZ;
+    float upX, upY, upZ;
+    float aspectRatio;
+    float fov;
+};
+
+struct Light{
+    float posX, posY, posZ;
+    float colR, colG, colB, colA;
+    float intensity;
+    float size;
+    bool global;
+};
+
+struct RayHit{
+    bool hit;
+    double distance;
+};
+
+struct VoxelChildren{
+    Voxel voxels[8];
+};
+
+struct StackEntry{
+    int depth;
+    int index;
+    float x;
+    float y;
+    float z;
+};
+
+struct OctreeReturn{
+
+    bool hit;
+    int hitCount;
+    int voxelType;
+};
+
+// Pass in Camera Information
+layout(binding = 1) buffer camera_data {
+
+    Camera cameras[];
+};
+
+// Pass in Lighting Information
+layout(binding = 2) buffer world_lights {
+
+    Light lights[];
+};
+
+/*// Pass in the Voxel Indices Array
+layout(binding = 3) buffer world_voxel_indices {
+
+    int voxel_indices[];
+};*/
+
+// Pass in the Voxel Data Array
+layout(binding = 4) buffer world_voxel_data {
+
+    Voxel world_voxels[];
+};
+
+// Pass in the world settings
+layout(binding = 5) buffer world_settings {
+
+    WorldSettings worldSettings[];
+};
+
+// Create an octree stack uniform
+layout(binding = 6) buffer OctreeStack{
+    StackEntry octreeStack[];
+};
+
+// Current Pointer for Position in Stack
+int stackPtr = 0;
+
+// Stack Push Function
+void StackPush(StackEntry entry){
+    octreeStack[stackPtr++] = entry;
+}
+
+// Stack Pop Function
+StackEntry StackPop(){
+    return octreeStack[--stackPtr];
+}
+
+int GetChildIndex(int parentIndex, int targetDepth, int childRelativeIndex){
+
+    // Calculate the number of nodes between each of the target nodes
+    int dist = 0;
+    for(int i = 0; i < worldSettings[0].octreeDepth - targetDepth; i++){
+
+        dist += int(pow(8, i));
+    }
+
+    // Calculate the childs index and return it
+    int childVoxelIndex = (parentIndex + 1) + (dist * childRelativeIndex);
+    return childVoxelIndex;
+}
+
+VoxelChildren GetChildVoxels(int parentIndex, int targetDepth) {
+
+    VoxelChildren voxChildren;
+
+    // Calculate the number of nodes between each of the target nodes
+    int dist = 0;
+    for(int i = 0; i < worldSettings[0].octreeDepth - targetDepth; i++){
+
+        dist += pow(8, i);
+    }
+
+    // Find the nodes within the flattenedNodes vector and push them to the childNodes vector
+    for(int i = 0; i < 8; i++){
+
+        int childVoxelIndex = (parentIndex + 1) + (dist * i);
+        voxChildren.voxels[i] = world_voxels[childVoxelIndex];
+    }
+
+    return voxChildren;
+}
+
+void GetChildOctants(inout int childOctants[8], int parentIndex, int targetDepth) {
+
+    // Calculate the number of nodes between each of the target nodes
+    int dist = 0;
+    for(int i = 0; i < worldSettings[0].octreeDepth - targetDepth; i++){
+
+        dist += int(pow(8, i));
+    }
+
+    // Find the nodes within the flattenedNodes vector and push them to the childNodes vector
+    for(int i = 0; i < 8; i++){
+
+        int childVoxelIndex = (parentIndex + 1) + (dist * i);
+        childOctants[i] = childVoxelIndex;
+    }
+}
+
+Voxel GetVoxel(int index){
+
+    Voxel voxel;
+    voxel.type = -999;
+    voxel.terminal = false;
+    voxel.hasChildren = false;
+
+    if(index < worldSettings[0].totalOctants && index >= 0){
+        return world_voxels[index];
+    }
+
+    //return world_voxels[index];
+    return voxel;
+}
+
+bool IsTerminal(Voxel voxel){
+
+    return voxel.terminal;
+}
+
+bool IsVoxel(Voxel voxel){
+
+    if(voxel.type == -999){
+        return false;
+    }
+
+    return true;
+}
+
+bool ShouldCheckChildren(Voxel voxel){
+
+    return voxel.hasChildren;
+}
+
+// https://www.researchgate.net/figure/Network-comparator-breakdown-and-example-for-sorting-eight-elements_fig4_335352247
+void OrderChildOctants(inout int orderedChildOctants[8], inout RayHit orderedRayHits[8], inout vec3 orderedChildPositions[8], bool reversed){
+
+    ivec2 comparisons[24] = {ivec2(0,1), ivec2(2,3), ivec2(3,5), ivec2(6,7),
+                            ivec2(0,3), ivec2(4,7), ivec2(1,2), ivec2(5,6), ivec2(0,1), ivec2(2,3), ivec2(3,5), ivec2(6,7),
+                            ivec2(0,7), ivec2(1,6), ivec2(2,5), ivec2(3,4), ivec2(0,2), ivec2(4,6), ivec2(1,3), ivec2(5,7), ivec2(0,1), ivec2(2,3), ivec2(3,5), ivec2(6,7)};
+
+    for(int i = 0; i < 24; i++){
+
+        // Get the rays that should be compared
+        RayHit r1 = orderedRayHits[comparisons[i].x];
+        RayHit r2 = orderedRayHits[comparisons[i].y];
+
+        // Used to determine if we want ordered or reverse ordered
+        bool comparison = false;
+        const float epsilon = 0.0001;
+        if(reversed){
+            comparison = (r1.distance - r2.distance) < epsilon;
+        }else{
+            comparison = (r1.distance - r2.distance) > epsilon;
+        }
+
+        // Compare the rays and update the ordered lists accordingly
+        if(comparison){
+
+            RayHit tempRay = orderedRayHits[comparisons[i].x];
+            int tempOctant = orderedChildOctants[comparisons[i].x];
+            vec3 tempPosition = orderedChildPositions[comparisons[i].x];
+
+            // Switch/Update the values in the ordered arrays
+            orderedRayHits[comparisons[i].x] = orderedRayHits[comparisons[i].y];
+            orderedRayHits[comparisons[i].y] = tempRay;
+
+            orderedChildOctants[comparisons[i].x] = orderedChildOctants[comparisons[i].y];
+            orderedChildOctants[comparisons[i].y] = tempOctant;
+
+            orderedChildPositions[comparisons[i].x] = orderedChildPositions[comparisons[i].y];
+            orderedChildPositions[comparisons[i].y] = tempPosition;
+        }
+    }
+}
+
+// https://tavianator.com/2022/ray_box_boundary.html
+RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float octantScale){
+
+    // Calculate the voxels bounding positions, i.e., two opposing corners of the voxel
+    vec3 voxelMin = voxelPosition;
+    vec3 voxelMax = voxelPosition + vec3(octantScale);
+
+    vec3 invRayDirection = 1.0 / rayDirection;
+
+    double tmin = 0.0, tmax = (1.0/0.0);
+
+    for (int d = 0; d < 3; ++d) {
+        double t1 = (voxelMin[d] - rayOrigin[d]) * invRayDirection[d];
+        double t2 = (voxelMax[d] - rayOrigin[d]) * invRayDirection[d];
+
+        tmin = max(tmin, min(t1, t2));
+        tmax = min(tmax, max(t1, t2));
+    }
+
+    RayHit rayHit = {false, 0};
+    const float epsilon = 0.0001;
+    if (tmin >= 0.0 && tmin < tmax - epsilon) {
+        rayHit.hit = true;
+        rayHit.distance = tmin;
+    }
+    return rayHit;
+}
+
+OctreeReturn RayTraceOctree(vec3 rayOrigin, vec3 rayDirection) {
+
+    // The return value to return
+    OctreeReturn or;
+    or.hit = false;
+
+    // The hit count
+    int hitCount = 0;
+
+    // Push the root node onto the stack
+    StackEntry entry = {0, 0, 0, 0, 0};
+    StackPush(entry);
+
+    // Settings set in the VoxelWorld header file
+    int scale = worldSettings[0].worldScale;
+    int octreeDepth = worldSettings[0].octreeDepth;
+
+    // The positional relationship of each child in the octree
+    vec3 childRelations[] = {vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), vec3(0,1,1), vec3(1,0,0), vec3(1,0,1), vec3(1,1,0), vec3(1,1,1)};
+
+    while (stackPtr > 0 && stackPtr < 1000) {
+
+        // Pop the top node from the stack
+        StackEntry current = StackPop();
+
+        // Get the current voxels position
+        vec3 currentOctantPosition = vec3(current.x, current.y, current.z);
+
+        // The scale of the octant at this position
+        float octantScale = scale * (1/pow(2, current.depth));
+
+        // Perform intersection testing with the current node
+        RayHit rayHit = RayIntersect(rayOrigin, rayDirection, currentOctantPosition, octantScale);
+        if (rayHit.hit) {
+
+            // Increment the hit counter
+            hitCount++;
+
+            // Check if the voxel at the current index is terminal
+            if(IsTerminal(GetVoxel(current.index))){
+                or.hit = true;
+                or.voxelType = GetVoxel(current.index).type;
+                or.hitCount = hitCount;
+                return or;
+            }
+
+            // If this octant has children add them to the stack
+            if(ShouldCheckChildren(GetVoxel(current.index))){
+
+                // Get an ordered list of all the child nodes of this node
+                int reverseOrderChildOctants[8];
+                RayHit reverseOrderChildRayHits[8];
+                vec3 reverseOrderChildPositions[8];
+
+                // The scale of the current octants child octants
+                float octantScaleX = scale * (1/pow(2, current.depth + 1));
+
+                // Get rayhit information of the child octants
+                for (int i = 0; i < 8; i++){
+
+                    // The calculated child position of the octant
+                    vec3 childOctantPosition = currentOctantPosition + (childRelations[i] * octantScale);
+
+                    // Perform intersection testing with the current child node
+                    RayHit rayHit = RayIntersect(rayOrigin, rayDirection, childOctantPosition, octantScale);
+
+                    // Calculate the child octants index in the octree
+                    int childIndex = GetChildIndex(current.index, current.depth, i);
+
+                    // Set the values in the soon to be ordered arrays
+                    reverseOrderChildOctants[i] = childIndex;
+                    reverseOrderChildRayHits[i] = rayHit;
+                    reverseOrderChildPositions[i] = childOctantPosition;
+                }
+
+                // Order the RayHits based on their distances from largest to smallest
+                OrderChildOctants(reverseOrderChildOctants, reverseOrderChildRayHits, reverseOrderChildPositions, true);
+
+                // Push the child nodes onto the stack
+                for (int i = 0; i < 5; i++){
+
+                    // Get the child nodes information
+                    int childDepth = current.depth + 1;
+                    int childOctantIndex = reverseOrderChildOctants[i];
+                    float childOctantX = reverseOrderChildPositions[i].x;
+                    float childOctantY = reverseOrderChildPositions[i].y;
+                    float childOctantZ = reverseOrderChildPositions[i].z;
+
+                    // Check if the octant has any children
+                    if ((ShouldCheckChildren(GetVoxel(childOctantIndex)) || IsTerminal(GetVoxel(childOctantIndex)) && current.depth < octreeDepth)){
+
+                        // Check if the child voxel is terminal
+                        if(IsTerminal(GetVoxel(childOctantIndex))){
+                            or.hit = true;
+                            or.voxelType = GetVoxel(childOctantIndex).type;
+                            or.hitCount = hitCount;
+                            return or;
+                        }
+
+                        // Create the stackEntry and push it to the stack
+                        StackEntry stackEntry = {childDepth, childOctantIndex, childOctantX, childOctantY, childOctantZ };
+                        StackPush(stackEntry);
+                    }
+                }
+            }
+        }
+    }
+
+    return or;
+}
+
+void main() {
+
+    // Set a default pixel color and obtain pixel coordinates
+    vec4 pixel = vec4(0.075, 0.133, 0.173, 1.0);
+    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+
+    // Obtain the camera position and orientation
+    vec3 cam_o = vec3(cameras[0].posX, cameras[0].posY, cameras[0].posZ);
+    vec3 cam_right = vec3(cameras[0].rightX, cameras[0].rightY, cameras[0].rightZ);
+    vec3 cam_up = vec3(cameras[0].upX, cameras[0].upY, cameras[0].upZ);
+    vec3 cam_dir = vec3(cameras[0].dirX, cameras[0].dirY, cameras[0].dirZ);
+
+    ivec2 dims = imageSize(screen);
+
+    // Adjust x and y for the aspect ratio
+    float aspectRatio = float(dims.x) / float(dims.y);
+    float x = (float(pixel_coords.x * 2 - dims.x) / dims.x) * aspectRatio;
+    float y = float(pixel_coords.y * 2 - dims.y) / dims.y;
+
+    // Define FOV in radians (for example, 60 degrees)
+    float fov = radians(cameras[0].fov); // Change the FOV value as needed
+
+    // Calculate the view space ray direction
+    float tanFov = tan(fov * 0.5);
+    vec3 rightDir = normalize(cam_right) * x * tanFov;
+    vec3 upDir = normalize(cam_up) * y * tanFov;
+    vec3 ray_d = normalize(cam_dir + rightDir + upDir);
+
+    // Calculate the point on the screen in the world space
+    vec3 ray_o = cam_o;
+
+    // Settings set in the VoxelWorld header file
+    int scale = worldSettings[0].worldScale;
+    int octreeDepth = worldSettings[0].octreeDepth;
+
+    OctreeReturn or = RayTraceOctree(ray_o, ray_d);
+    if(or.hit){
+
+        pixel = vec4(or.hitCount/2f,or.hitCount/2f,or.hitCount/2f,1);
+    }
+
+
+    /*// The positional relationship of each child in the octree
+    vec3 childRelations[] = {vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), vec3(0,1,1), vec3(1,0,0), vec3(1,0,1), vec3(1,1,0), vec3(1,1,1)};
+
+    // Variables to hold the child that was hit closest
+    double minHitDistance = (1.0/0.0);
+    int minHitChild = -1;
+    bool intersectFound = false;
+    bool haveChildren = false;
+
+    // Check for intersection of the ray within the octree
+    vec3 parentVoxelPosition = vec3(0, 0, 0);
+    int hitcount = 0;
+    for(int i = 0; i < octreeDepth; i++){
+
+        // Hit this octant
+        bool octantHit = false;
+
+        // The scale of the octant at this position
+        float octantScale = scale * (1/pow(2, i));
+
+        // Check if the ray will intersect with any of the child voxels
+        for(int j = 0; j < 8; j++){
+
+            vec3 voxelPosition = parentVoxelPosition + (childRelations[j] * octantScale);  // Voxel is located at the origin
+            RayHit rayHit = RayIntersect(ray_o, ray_d, voxelPosition, octantScale);
+
+            // Update the parent voxels position to be that of the hit voxel
+            if(rayHit.hit){
+
+                // If this is the first hit for this octant then reset the minimum values
+                if(!octantHit){
+                    octantHit = true;
+                    minHitDistance = (1.0/0.0);
+                    minHitChild = -1;
+                    intersectFound = false;
+                }
+
+                if(rayHit.distance < minHitDistance){
+                    minHitDistance = rayHit.distance;
+                    minHitChild = j;
+                    intersectFound = true;
+                }
+
+                hitcount = hitcount + 1;
+            }
+        }
+
+        if(octantHit){
+            parentVoxelPosition = parentVoxelPosition + (childRelations[minHitChild] * octantScale);
+        }
+    }
+
+    if(intersectFound){
+        // Render the closest hit child
+        //pixel = vec4((GetVoxel(parentIndex).type));
+        //pixel = vec4(pow(indexXXX, 5)/pow(250.0, 6));
+        pixel = vec4(hitcount/40.0);
+        //pixel = vec4(parentVoxelPosition.x/float(scale*2), parentVoxelPosition.y/float(scale*2), parentVoxelPosition.z/float(scale*2), 1);
+    }*/
+
+    imageStore(screen, pixel_coords, pixel);
+}
