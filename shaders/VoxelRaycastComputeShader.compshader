@@ -8,8 +8,9 @@ struct Voxel{
 };
 
 struct WorldSettings{
-    int octreeDepth;
-    int worldScale;
+    int chunkSize;
+    int renderDistance;
+    int totalSize;
 };
 
 struct Camera{
@@ -32,6 +33,11 @@ struct Light{
 struct RayHit{
     bool hit;
     float distance;
+};
+
+struct RaycastResult{
+    bool hit;
+    vec4 colour;
 };
 
 // Pass in Camera Information
@@ -64,6 +70,63 @@ layout(binding = 5) buffer world_settings {
     WorldSettings worldSettings[];
 };
 
+int FlatIndex(int x, int y, int z){
+
+    // Make sure in bounds positive
+    if(x >= worldSettings[0].totalSize || y >= worldSettings[0].totalSize || z >= worldSettings[0].totalSize){
+        return -1;
+    }
+
+    // Makes sure in bounds negative
+    if(x < 0 || y < 0 || z < 0){
+        return -1;
+    }
+
+    return x + worldSettings[0].totalSize * (y + worldSettings[0].totalSize * z);
+}
+
+int GetVoxelIndex(int x, int y, int z){
+
+    int index = FlatIndex(x, y, z);
+    if(index >= 0 && index < voxel_indices.length()){
+
+        return voxel_indices[FlatIndex(x, y, z)];
+    }
+
+    return -1;
+}
+
+bool IsAirVoxel(int x, int y, int z){
+
+    if(world_voxels[GetVoxelIndex(x, y, z)].type == 0){
+        return true;
+    }
+
+    return false;
+}
+
+bool IsVoxelAt(int x, int y, int z){
+
+    // Check if there is a voxel at the given coordinates
+    if(GetVoxelIndex(x, y, z) != -1 && !IsAirVoxel(x, y, z)){
+
+        return true;
+    }
+
+    return false;
+}
+
+Voxel GetVoxelAt(int x, int y, int z){
+
+    if(IsVoxelAt(x, y, z)){
+
+        return world_voxels[GetVoxelIndex(x, y, z)];
+    }
+
+    return Voxel(-1);
+}
+
+// TODO: use this function to ensure that the raycast is within the expected bounds of the current raytrace loop from Raycast()
 // https://tavianator.com/2022/ray_box_boundary.html
 RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float octantScale){
 
@@ -89,6 +152,61 @@ RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float
         rayHit.distance = tmin;
     }
     return rayHit;
+}
+
+RaycastResult Raycast(vec3 ray_o, vec3 ray_d){
+
+    // The return object of the function
+    RaycastResult result = {false, vec4(0,0,0,0)};
+
+    // Raycasting Logic
+    vec3 pos = floor(ray_o);
+    vec3 step = sign(ray_d);
+    vec3 tDelta = step / ray_d;
+    float tMaxX, tMaxY, tMaxZ;
+    vec3 fr = fract(ray_o);
+
+    tMaxX = tDelta.x * ((ray_d.x>0.0) ? (1.0 - fr.x) : fr.x);
+    tMaxY = tDelta.y * ((ray_d.y>0.0) ? (1.0 - fr.y) : fr.y);
+    tMaxZ = tDelta.z * ((ray_d.z>0.0) ? (1.0 - fr.z) : fr.z);
+
+    vec3 norm;
+    const int maxTrace = 1000;
+    for (int i = 0; i < maxTrace; i++) {
+
+        if (tMaxX < tMaxY) {
+            if (tMaxZ < tMaxX) {
+                tMaxZ += tDelta.z;
+                pos.z += step.z;
+                norm = vec3(0, 0,-step.z);
+            } else {
+                tMaxX += tDelta.x;
+                pos.x += step.x;
+                norm = vec3(-step.x, 0, 0);
+            }
+        } else {
+            if (tMaxZ < tMaxY) {
+                tMaxZ += tDelta.z;
+                pos.z += step.z;
+                norm = vec3(0, 0, -step.z);
+            } else {
+                tMaxY += tDelta.y;
+                pos.y += step.y;
+                norm = vec3(0, -step.y, 0);
+            }
+        }
+
+        // Check if there is a voxel at the position
+        if(IsVoxelAt(int(pos.x), int(pos.y), int(pos.z))){
+
+            Voxel vox = GetVoxelAt(int(pos.x), int(pos.y), int(pos.z));
+            result.colour = vec4(vox.type / 255.0, vox.type / 255.0, vox.type / 255.0, 1);
+            result.hit = true;
+            break;
+        }
+    }
+
+    return result;
 }
 
 void main() {
@@ -122,64 +240,10 @@ void main() {
     // Calculate the point on the screen in the world space
     vec3 ray_o = cam_o;
 
-    // The positional relationship of each child in the octree
-    vec3 childRelations[] = {vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), vec3(0,1,1), vec3(1,0,0), vec3(1,0,1), vec3(1,1,0), vec3(1,1,1)};
-
-    // Variables to hold the child that was hit closest
-    float minHitDistance = (1.0/0.0);
-    int minHitChild = -1;
-    bool intersectFound = false;
-
-    int hitcount = 0;
-
-    // Check for intersection of the ray within the octree
-    int scale = worldSettings[0].worldScale;
-    int octreeDepth = worldSettings[0].octreeDepth; // The maximum depth of the octree (should be set as a buffer object)
-    vec3 parentVoxelPosition = vec3(0, 0, 0);
-    for(int i = 0; i < octreeDepth; i++){
-
-        // Hit this octant
-        bool octantHit = false;
-
-        // The scale of the octant at this position
-        float octantScale = scale * (1/pow(2, i));
-
-        // Check if the ray will intersect with any of the child voxels
-        for(int j = 0; j < 8; j++){
-
-            vec3 voxelPosition = parentVoxelPosition + (childRelations[j] * octantScale);  // Voxel is located at the origin
-            RayHit rayHit = RayIntersect(ray_o, ray_d, voxelPosition, octantScale);
-
-            // Update the parent voxels position to be that of the hit voxel
-            if(rayHit.hit){
-
-                // If this is the first hit for this octant then reset the minimum values
-                if(!octantHit){
-                    octantHit = true;
-                    minHitDistance = (1.0/0.0);
-                    minHitChild = -1;
-                    intersectFound = false;
-                }
-
-                if(rayHit.distance < minHitDistance){
-                    minHitDistance = rayHit.distance;
-                    minHitChild = j;
-                    intersectFound = true;
-                }
-
-                hitcount = hitcount + 1;
-            }
-        }
-
-        if(octantHit){
-            parentVoxelPosition = parentVoxelPosition + (childRelations[minHitChild] * octantScale);
-        }
-    }
-
-    if(intersectFound){
-        // Render the closest hit child
-        pixel = vec4(hitcount/40.0);
-        //pixel = vec4(parentVoxelPosition.x/float(scale*2), parentVoxelPosition.y/float(scale*2), parentVoxelPosition.z/float(scale*2), 1);
+    // Run the Raycasting algorithm to check whether a ray will intersect a voxel
+    RaycastResult rayResult = Raycast(ray_o, ray_d);
+    if(rayResult.hit){
+        pixel = rayResult.colour;
     }
 
     imageStore(screen, pixel_coords, pixel);

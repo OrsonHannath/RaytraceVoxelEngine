@@ -11,7 +11,6 @@
 #include <vector>
 #include <cmath>
 #include <map>
-#include "VoxelOctree.h"
 #include "Camera.h"
 #include "SRombauts/SimplexNoise.h"
 #include "DeltaTime/DeltaTime.h"
@@ -21,16 +20,14 @@ class VoxelWorld {
 private:
     SimplexNoise* simplexNoise;
 
-    // The depth of the voxel octree
-    int octreeDepth = 3;
+    // The number of chunks viewed in the world;
+    int renderDistance = 3;
 
-    // The scale of the world (the largest voxel)
-    int worldScale = 16;
+    // The number of voxels along x, y, z axis
+    int chunkSize = 16;
 
     std::vector<Voxel> worldVoxels; // A Vector that stores all the voxels that are in the world
     int* voxelIndices; // An array that stores all voxel indexes of size chunkSize^3 * renderDist^3
-
-    VoxelOctree* voxelOctree; // The SparseVoxelOctree for the voxels
 
     GLuint voxelDataBuffer;
     GLuint voxelIndicesBuffer;

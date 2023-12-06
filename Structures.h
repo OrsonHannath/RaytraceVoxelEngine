@@ -9,7 +9,6 @@
 
 struct Voxel{
     int type;
-    bool terminal;
 
     std::string toString(){
         return std::to_string(type);
@@ -18,26 +17,9 @@ struct Voxel{
 
 struct WorldSettings{
 
-    int octreeDepth;
-    int worldScale;
-};
-
-struct VoxelData{
-    int voxelType; // A type in the range of 0-255
-};
-
-struct Node {
-    bool terminal;
-    Node *children[8];
-    Voxel voxelData;
-
-    Node(){
-        terminal = false;
-        voxelData = {-1};
-        for(int i = 0; i < 8; i++){
-            children[i] = nullptr;
-        }
-    }
+    int renderDistance;
+    int chunkSize;
+    int totalSize;
 };
 
 struct iVec3{

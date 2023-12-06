@@ -8,9 +8,6 @@ VoxelWorld::VoxelWorld() {
 
     std::cout << "--- Creating Voxel World ---" << std::endl;
 
-    // Create the sparse voxel octree
-    voxelOctree = new VoxelOctree(TotalWorldSize(), octreeDepth);
-
     // Generate buffers
     glGenBuffers(1, &voxelIndicesBuffer);
     glGenBuffers(1, &voxelDataBuffer);
@@ -34,30 +31,14 @@ VoxelWorld::VoxelWorld() {
                 // Determine the voxels type using the simplex noise
                 int voxelType = (int)roundf(simplexNoise->fractal(1, x, y, z) * 255);
 
+                // Create the voxel structure and add it to the voxels vector
+                Voxel voxel = {voxelType};
+                worldVoxels.push_back(voxel);
+
                 int voxelIndex = (int)worldVoxels.size() - 1;
                 voxelIndices[FlatIndex(x, y, z)] = voxelIndex;
-
-                // Sparse Voxel Octree Insertions
-                Voxel voxelData = {voxelType, true};
-                voxelOctree->Insert(fVec3(x, y, z), voxelData);
             }
         }
-    }
-
-    // Update the worldVoxels
-    voxelOctree->FlattenOctree(worldVoxels);
-
-    // Get the nodes at a depth of 0
-    std::vector<Voxel> childNodes;
-    std::vector<int> indices;
-    voxelOctree->GetChildNodes(worldVoxels, 0, 0, childNodes, indices);
-
-    for(int i : indices){
-        std::cout << i << std::endl;
-    }
-
-    for(Voxel vox : childNodes){
-        std::cout << vox.type << ", " << vox.terminal << std::endl;
     }
 
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
@@ -70,12 +51,12 @@ VoxelWorld::~VoxelWorld() {
 
 int VoxelWorld::TotalVoxels() const {
 
-    return pow(8, octreeDepth);
+    return pow(renderDistance, 3) * pow(chunkSize, 3);
 }
 
 int VoxelWorld::TotalWorldSize() const {
 
-    return pow(2, octreeDepth);
+    return renderDistance * chunkSize;
 }
 
 int VoxelWorld::FlatIndex(int x_, int y_, int z_) {
@@ -139,8 +120,9 @@ void VoxelWorld::UpdateWorldSettingsBuffer() {
 
     // chunkSize, renderDistance, totalSize
     WorldSettings worldSettings = WorldSettings();
-    worldSettings.octreeDepth = octreeDepth;
-    worldSettings.worldScale = worldScale;
+    worldSettings.renderDistance = renderDistance;
+    worldSettings.chunkSize = chunkSize;
+    worldSettings.totalSize = TotalWorldSize();
 
     // Send the world settings to the Raytrace shader
     glGenBuffers(1, &worldSettingsBuffer);
