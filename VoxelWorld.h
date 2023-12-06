@@ -21,10 +21,13 @@ private:
     SimplexNoise* simplexNoise;
 
     // The number of chunks viewed in the world;
-    int renderDistance = 3;
+    int renderDistance = 12;
 
     // The number of voxels along x, y, z axis
     int chunkSize = 16;
+
+    // Used to determine whether the world voxels have been updated and therefor need to be updated on raytracing shader
+    bool updateVoxels = true;
 
     std::vector<Voxel> worldVoxels; // A Vector that stores all the voxels that are in the world
     int* voxelIndices; // An array that stores all voxel indexes of size chunkSize^3 * renderDist^3

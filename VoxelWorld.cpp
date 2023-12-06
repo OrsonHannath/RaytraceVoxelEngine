@@ -41,6 +41,7 @@ VoxelWorld::VoxelWorld() {
         }
     }
 
+    updateVoxels = true;
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
 }
 
@@ -99,21 +100,30 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
 
 void VoxelWorld::UpdateVoxelBuffers() {
 
-    // Delete the buffers before updating them to avoid memory leakage
-    glDeleteBuffers(1, &voxelIndicesBuffer);
-    glDeleteBuffers(1, &voxelDataBuffer);
+    // Make sure the voxel buffer needs to be updated before updating it
+    if(updateVoxels) {
 
-    // Send the voxel indices to the Raytrace Shader
-    glGenBuffers(1, &voxelIndicesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelIndicesBuffer);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, voxelIndicesBuffer);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels() * sizeof(int), voxelIndices, 0);
+        std::cout << "Updating Voxel Buffers" << std::endl;
 
-    // Send the voxel data to the Raytrace Shader
-    glGenBuffers(1, &voxelDataBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelDataBuffer);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, voxelDataBuffer);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, worldVoxels.size() * sizeof(Voxel), worldVoxels.data(), 0);
+        // Delete the buffers before updating them to avoid memory leakage
+        glDeleteBuffers(1, &voxelIndicesBuffer);
+        glDeleteBuffers(1, &voxelDataBuffer);
+
+        // Send the voxel indices to the Raytrace Shader
+        glGenBuffers(1, &voxelIndicesBuffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelIndicesBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, voxelIndicesBuffer);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels() * sizeof(int), voxelIndices, 0);
+
+        // Send the voxel data to the Raytrace Shader
+        glGenBuffers(1, &voxelDataBuffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelDataBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, voxelDataBuffer);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, worldVoxels.size() * sizeof(Voxel), worldVoxels.data(), 0);
+
+        // Update updateVoxels as they have now been passed to the shader
+        updateVoxels = false;
+    }
 }
 
 void VoxelWorld::UpdateWorldSettingsBuffer() {
