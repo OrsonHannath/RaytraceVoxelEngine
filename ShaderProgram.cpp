@@ -77,7 +77,7 @@ ShaderProgram::ShaderProgram(std::string programName_, std::vector<std::string> 
     }
 
     // Compile and Link the program
-    glCompileShader(programID);
+    //glCompileShader(programID); // This was causing error 1282
     glLinkProgram(programID);
 
     // Check the program

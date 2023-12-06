@@ -11,6 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <map>
+#include <cstring>
 #include "Camera.h"
 #include "SRombauts/SimplexNoise.h"
 #include "DeltaTime/DeltaTime.h"
@@ -21,10 +22,10 @@ private:
     SimplexNoise* simplexNoise;
 
     // The number of chunks viewed in the world;
-    int renderDistance = 12;
+    int renderDistance = 1;
 
     // The number of voxels along x, y, z axis
-    int chunkSize = 16;
+    int chunkSize = 8;
 
     // Used to determine whether the world voxels have been updated and therefor need to be updated on raytracing shader
     bool updateVoxels = true;
@@ -32,6 +33,10 @@ private:
     std::vector<Voxel> worldVoxels; // A Vector that stores all the voxels that are in the world
     int* voxelIndices; // An array that stores all voxel indexes of size chunkSize^3 * renderDist^3
 
+    // Identifier for the Raytrace Shader Program
+    GLuint raytraceProgram;
+
+    // Identifiers for all shader buffers
     GLuint voxelDataBuffer;
     GLuint voxelIndicesBuffer;
     GLuint activeCameraBuffer;
@@ -48,12 +53,14 @@ public:
     int TotalWorldSize() const; // Returns the total size of the world i.e. chunkSize * renderDist
     int FlatIndex(int x_, int y_, int z_); // Returns a flattened index from a 3D position
 
+    void UpdateVoxel(int voxelIndex, Voxel replacementVoxel); // Updates a single voxel in the voxels SBO
     void UpdateWorldSettingsBuffer(); // Updates the world settings buffer
     void UpdateCameraBuffer(); // Updates the camera buffers
     void UpdateVoxelBuffers(); // Updates the voxel data buffers
     void RenderWorld(GLFWwindow* window, std::map<std::string, GLuint> GLHandles); // Used to run the raytracing to render the world
 
     void SetActiveCamera(Camera* camera_);
+    void SetRaytraceProgram(GLuint programID);
 };
 
 

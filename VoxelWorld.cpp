@@ -75,6 +75,17 @@ Voxel VoxelWorld::GetVoxelAt(int x_, int y_, int z_) {
     return Voxel{};
 }
 
+// This allows for changing a single voxel in the Voxels SBO
+void VoxelWorld::UpdateVoxel(int voxelIndex, Voxel replacementVoxel) {
+
+    // The starting location of the voxel to replace in bytes
+    GLintptr startLocation = sizeof(Voxel) * voxelIndex;
+    GLsizeiptr voxelStructSize = sizeof(Voxel);
+
+    // Update the buffer such that the voxel is replaced at the given location
+    glNamedBufferSubData(voxelDataBuffer, startLocation, voxelStructSize, &replacementVoxel);
+}
+
 // This renders the world using the ray-cast shader
 void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> GLHandles) {
 
@@ -113,13 +124,15 @@ void VoxelWorld::UpdateVoxelBuffers() {
         glGenBuffers(1, &voxelIndicesBuffer);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelIndicesBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, voxelIndicesBuffer);
-        glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels() * sizeof(int), voxelIndices, 0);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, TotalVoxels() * sizeof(int), voxelIndices, GL_DYNAMIC_STORAGE_BIT); // GL_DYNAMIC_STORAGE_BIT necessary if wanting to mutate the buffer
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
 
         // Send the voxel data to the Raytrace Shader
         glGenBuffers(1, &voxelDataBuffer);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelDataBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, voxelDataBuffer);
-        glBufferStorage(GL_SHADER_STORAGE_BUFFER, worldVoxels.size() * sizeof(Voxel), worldVoxels.data(), 0);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, worldVoxels.size() * sizeof(Voxel), worldVoxels.data(), GL_DYNAMIC_STORAGE_BIT); // GL_DYNAMIC_STORAGE_BIT necessary if wanting to mutate the buffer
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
 
         // Update updateVoxels as they have now been passed to the shader
         updateVoxels = false;
@@ -139,6 +152,7 @@ void VoxelWorld::UpdateWorldSettingsBuffer() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, worldSettingsBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, worldSettingsBuffer);
     glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(WorldSettings), &worldSettings, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
 }
 
 void VoxelWorld::UpdateCameraBuffer() {
@@ -178,9 +192,15 @@ void VoxelWorld::UpdateCameraBuffer() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, activeCameraBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, activeCameraBuffer);
     glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(CameraStruct), &cameraStruct, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
 }
 
 void VoxelWorld::SetActiveCamera(Camera *camera_) {
 
     activeCamera = camera_;
+}
+
+void VoxelWorld::SetRaytraceProgram(GLuint programID) {
+
+    raytraceProgram = programID;
 }

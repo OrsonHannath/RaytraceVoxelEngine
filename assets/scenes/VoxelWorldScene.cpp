@@ -12,6 +12,7 @@ VoxelWorldScene::VoxelWorldScene(std::string name, GLFWwindow* window_, std::map
     // Create the Voxel World
     voxelWorld = new VoxelWorld();
     voxelWorld->SetActiveCamera(mainCamera);
+    voxelWorld->SetRaytraceProgram(GLHandles_.at("RaytraceProgram"));
 }
 
 void VoxelWorldScene::UpdateScene(float *deltaTimePtr) {
