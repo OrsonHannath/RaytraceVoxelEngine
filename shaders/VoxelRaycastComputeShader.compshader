@@ -134,11 +134,11 @@ Voxel GetVoxelAt(int x, int y, int z){
 
 // TODO: use this function to ensure that the raycast is within the expected bounds of the current raytrace loop from Raycast()
 // https://tavianator.com/2022/ray_box_boundary.html
-RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float octantScale){
+RayHit RayIntersect(vec3 rayOrigin, vec3 rayDirection, vec3 voxelPosition, float voxelScale){
 
     // Calculate the voxels bounding positions, i.e., two opposing corners of the voxel
     vec3 voxelMin = voxelPosition;
-    vec3 voxelMax = voxelPosition + vec3(octantScale);
+    vec3 voxelMax = voxelPosition + vec3(voxelScale);
 
     vec3 invRayDirection = 1.0 / rayDirection;
 
@@ -176,9 +176,25 @@ RaycastResult Raycast(vec3 ray_o, vec3 ray_d){
     tMaxY = tDelta.y * ((ray_d.y>0.0) ? (1.0 - fr.y) : fr.y);
     tMaxZ = tDelta.z * ((ray_d.z>0.0) ? (1.0 - fr.z) : fr.z);
 
+    // Check that the ray has the possibility to intersect a voxel using the RayIntersect function
+    RayHit rh = RayIntersect(ray_o, ray_d, vec3(0,0,0), worldSettings[0].chunkSize * worldSettings[0].renderDistance);
+    if(!rh.hit){
+        return result;
+    }
+
     vec3 norm;
     const int maxTrace = 1000;
+    const int tracesCheckInt = 50;
     for (int i = 0; i < maxTrace; i++) {
+
+        // Every x traces check that the ray has the potential to collide with a voxel using the RayIntersect function
+        if(i % tracesCheckInt == 0){
+
+            RayHit rh = RayIntersect(ray_o, ray_d, vec3(0,0,0), worldSettings[0].chunkSize * worldSettings[0].renderDistance);
+            if(!rh.hit){
+                break;
+            }
+        }
 
         if (tMaxX < tMaxY) {
             if (tMaxZ < tMaxX) {

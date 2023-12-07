@@ -43,6 +43,9 @@ bool OpenGLApp::OnInit() {
         return -1;
     }
 
+    // Disables VSync
+    glfwSwapInterval(0);
+
     // Output the current version of opengl
     std::cout << glGetString(GL_VERSION) << std::endl;
 
