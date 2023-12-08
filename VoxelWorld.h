@@ -22,7 +22,7 @@ private:
     SimplexNoise* simplexNoise;
 
     // The number of chunks viewed in the world;
-    int renderDistance = 4;
+    int renderDistance = 2;
 
     // The number of voxels along x, y, z axis
     int chunkSize = 32;
@@ -36,6 +36,9 @@ private:
     // An array that stores all voxel indexes of size chunkSize^3 * renderDist^3
     int* voxelIndices;
 
+    // Raytrace Lighting Settings
+    int maxBounces = 3;
+
     // A vector that stores all the lights in the scene
     std::vector<Light> sceneLights;
 
@@ -48,6 +51,7 @@ private:
     GLuint activeCameraBuffer;
     GLuint lightsBuffer;
     GLuint worldSettingsBuffer;
+    GLuint lightingSettingsBuffer;
 
     Camera* activeCamera;
 public:
@@ -65,6 +69,7 @@ public:
     void UpdateCameraBuffer(); // Updates the camera buffers
     void UpdateVoxelBuffers(); // Updates the voxel data buffers
     void UpdateLightsBuffer(); // Updates all lights in the lights buffer
+    void UpdateLightingSettingsBuffer(); // Updates the lighting settings buffer
     void RenderWorld(GLFWwindow* window, std::map<std::string, GLuint> GLHandles); // Used to run the raytracing to render the world
 
     void SetActiveCamera(Camera* camera_);

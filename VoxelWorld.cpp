@@ -99,6 +99,9 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
     // Update the world settings buffer
     UpdateWorldSettingsBuffer();
 
+    // Update the lighting settings buffer
+    UpdateLightingSettingsBuffer();
+
     // Update the cameras buffer
     UpdateCameraBuffer();
 
@@ -169,6 +172,21 @@ void VoxelWorld::UpdateWorldSettingsBuffer() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, worldSettingsBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, worldSettingsBuffer);
     glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(WorldSettings), &worldSettings, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
+}
+
+// This data should really not be coming from here since it should be part of a higher level script i.e. scene settings
+void VoxelWorld::UpdateLightingSettingsBuffer() {
+
+    LightingSettings lightingSettings = LightingSettings();
+    lightingSettings.state = rand() % 4294967295;
+    lightingSettings.maxBounces = maxBounces;
+
+    // Send the world settings to the Raytrace shader
+    glGenBuffers(1, &lightingSettingsBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightingSettingsBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightingSettingsBuffer);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(LightingSettings), &lightingSettings, 0);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
 }
 

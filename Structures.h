@@ -54,6 +54,11 @@ struct WorldSettings{
     int totalSize;
 };
 
+struct LightingSettings{
+    int state; // Passing in a random state allows for better random generation each frame
+    int maxBounces;
+};
+
 struct iVec3{
     int x, y, z;
 
