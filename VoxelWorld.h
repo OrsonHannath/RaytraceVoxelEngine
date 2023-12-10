@@ -16,9 +16,12 @@
 #include "SRombauts/SimplexNoise.h"
 #include "DeltaTime/DeltaTime.h"
 #include "Structures.h"
+#include "VoxelTypeInformation.h"
+#include "assets/voxel_type_information/DefaultVoxelTypes.h"
 
 class VoxelWorld {
 private:
+    VoxelTypeInformation* voxelTypeInformation;
     SimplexNoise* simplexNoise;
 
     // The number of chunks viewed in the world;
@@ -30,6 +33,9 @@ private:
     // Used to determine whether the world voxels have been updated and therefor need to be updated on raytracing shader
     bool updateVoxels = true;
 
+    // Used to determine whether we should update the voxel data information buffer
+    bool updateVoxelTypeInformation = true;
+
     // A Vector that stores all the voxels that are in the world
     std::vector<Voxel> worldVoxels;
 
@@ -37,7 +43,7 @@ private:
     int* voxelIndices;
 
     // Raytrace Lighting Settings
-    int maxBounces = 3;
+    int maxBounces = 6;
 
     // A vector that stores all the lights in the scene
     std::vector<Light> sceneLights;
@@ -48,6 +54,7 @@ private:
     // Identifiers for all shader buffers
     GLuint voxelDataBuffer;
     GLuint voxelIndicesBuffer;
+    GLuint voxelTypeDataBuffer;
     GLuint activeCameraBuffer;
     GLuint lightsBuffer;
     GLuint worldSettingsBuffer;
@@ -66,6 +73,7 @@ public:
     void UpdateVoxel(int voxelIndex, Voxel replacementVoxel); // Updates a single voxel in the voxels SBO
     void UpdateLight(int lightIndex, Voxel replacementLight); // Updates a single light in the lights SBO
     void UpdateWorldSettingsBuffer(); // Updates the world settings buffer
+    void UpdateVoxelTypeDataBuffer(); // Updates the voxel type information
     void UpdateCameraBuffer(); // Updates the camera buffers
     void UpdateVoxelBuffers(); // Updates the voxel data buffers
     void UpdateLightsBuffer(); // Updates all lights in the lights buffer

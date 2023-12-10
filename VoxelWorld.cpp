@@ -41,6 +41,9 @@ VoxelWorld::VoxelWorld() {
         }
     }
 
+    // Load the voxel types information
+    voxelTypeInformation = new DefaultVoxelTypes();
+
     updateVoxels = true;
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
 }
@@ -93,6 +96,9 @@ void VoxelWorld::RenderWorld(GLFWwindow *window, std::map<std::string, GLuint> G
     int win_width, win_height;
     glfwGetWindowSize(window, &win_width, &win_height);
 
+    // Update the voxel type data buffer
+    UpdateVoxelTypeDataBuffer();
+
     // Update the lights buffer
     UpdateLightsBuffer();
 
@@ -142,6 +148,31 @@ void VoxelWorld::UpdateVoxelBuffers() {
 
         // Update updateVoxels as they have now been passed to the shader
         updateVoxels = false;
+    }
+}
+
+void VoxelWorld::UpdateVoxelTypeDataBuffer() {
+
+    // Make sure the voxel data type buffer needs to be updated before updating it
+    if(updateVoxelTypeInformation) {
+
+        std::cout << "Updating Voxel Type Information Buffer" << std::endl;
+
+        // Get the voxel type information
+        std::vector<VoxelType> voxelTypes = voxelTypeInformation->GetVoxelTypeInformation(256);
+
+        // Delete the buffers before updating them to avoid memory leakage
+        glDeleteBuffers(1, &voxelTypeDataBuffer);
+
+        // Send the voxel data to the Raytrace Shader
+        glGenBuffers(1, &voxelTypeDataBuffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelTypeDataBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, voxelTypeDataBuffer);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, voxelTypes.size() * sizeof(VoxelType), voxelTypes.data(), GL_DYNAMIC_STORAGE_BIT); // GL_DYNAMIC_STORAGE_BIT necessary if wanting to mutate the buffer
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // Unbind the buffer
+
+        // Update updateVoxels as they have now been passed to the shader
+        updateVoxelTypeInformation = false;
     }
 }
 

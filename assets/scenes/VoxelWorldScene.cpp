@@ -15,8 +15,12 @@ VoxelWorldScene::VoxelWorldScene(std::string name, GLFWwindow* window_, std::map
     voxelWorld->SetRaytraceProgram(GLHandles_.at("RaytraceProgram"));
 
     // Create a global light
-    Light ambientLight = Light(1, vec3(0, 0, 0), vec3(236.0/255.0, 225.0/255.0, 188.0/255.0), 0.25, true, true);
+    Light ambientLight = Light(0, 1, fVec3(0, 0, 0), fVec3(0, 0, 0), fVec3(236.0/255.0, 225.0/255.0, 188.0/255.0), 0.1);
     voxelWorld->AddLight(ambientLight);
+
+    // Create a directional light
+    Light directionalLight = Light(1, 1, fVec3(0, 0, 0), fVec3(-1, -1, -1), fVec3(1.0, 1.0, 1.0), 2.0);
+    voxelWorld->AddLight(directionalLight);
 }
 
 void VoxelWorldScene::UpdateScene(float *deltaTimePtr) {

@@ -7,6 +7,18 @@ struct Voxel{
     int type;
 };
 
+struct VoxelType{
+    int type;
+    float opacity;
+    float r;
+    float g;
+    float b;
+    float emission_r;
+    float emission_g;
+    float emission_b;
+    float emission_strength;
+};
+
 struct WorldSettings{
     int numberOfLights;
     int chunkSize;
@@ -30,17 +42,11 @@ struct Camera{
 
 struct Light{
     float size;
-    float x;
-    float y;
-    float z;
-    float r;
-    float g;
-    float b;
+    float x, y, z;
+    float dirX, dirY, dirZ;
+    float r, g, b;
     float intensity;
-
-    // Could maybe turn these into enums?
-    bool global;
-    bool ambient;
+    int type;  // 0 = ambient, 1 = directional, 2 = point, 3 = spot
 };
 
 struct RayHit{
@@ -48,11 +54,17 @@ struct RayHit{
     float distance;
 };
 
+struct VoxelProperties{
+    vec4 colour;
+    vec4 emission;
+    float emission_strength;
+};
+
 struct RaycastResult{
     bool hit;
-    vec4 colour;
     vec3 position;
     vec3 normal;
+    VoxelProperties voxelProperties;
 };
 
 struct Ray{
@@ -99,6 +111,12 @@ layout(binding = 5) buffer world_settings {
 layout(binding = 6) buffer lighting_settings {
 
     LightingSettings lightingSettings[];
+};
+
+// Pass in the voxel types information
+layout(binding = 7) buffer voxel_type_data {
+
+    VoxelType voxel_types[];
 };
 
 int FlatIndex(int x, int y, int z){
@@ -157,21 +175,26 @@ Voxel GetVoxelAt(int x, int y, int z){
     return Voxel(-1);
 }
 
-// TODO: use this function to ensure that the raycast is within the expected bounds of the current raytrace loop from Raycast()
+vec4 SkyboxColour(Ray ray){
+
+    vec4 colour = vec4(0.075, 0.133, 0.173, 1.0);
+    return colour;
+}
+
 // https://tavianator.com/2022/ray_box_boundary.html
-RayHit RayIntersect(Ray ray, vec3 voxelPosition, float voxelScale){
+RayHit RayIntersect(Ray ray, vec3 boundsPosition, float boundsScale){
 
     // Calculate the voxels bounding positions, i.e., two opposing corners of the voxel
-    vec3 voxelMin = voxelPosition;
-    vec3 voxelMax = voxelPosition + vec3(voxelScale);
+    vec3 boundsMin = boundsPosition - 1; // decrease by 1 to account for edge cases
+    vec3 boundsMax = boundsPosition + vec3(boundsScale) + 1; // increase by 1 to account for edge cases
 
     vec3 invRayDirection = 1.0 / ray.direction;
 
     float tmin = 0.0, tmax = (1.0/0.0);
 
     for (int d = 0; d < 3; ++d) {
-        float t1 = (voxelMin[d] - ray.origin[d]) * invRayDirection[d];
-        float t2 = (voxelMax[d] - ray.origin[d]) * invRayDirection[d];
+        float t1 = (boundsMin[d] - ray.origin[d]) * invRayDirection[d];
+        float t2 = (boundsMax[d] - ray.origin[d]) * invRayDirection[d];
 
         tmin = max(tmin, min(t1, t2));
         tmax = min(tmax, max(t1, t2));
@@ -188,7 +211,7 @@ RayHit RayIntersect(Ray ray, vec3 voxelPosition, float voxelScale){
 RaycastResult Raycast(Ray ray){
 
     // The return object of the function
-    RaycastResult result = {false, vec4(0,0,0,0), vec3(0,0,0), vec3(0,0,0)};
+    RaycastResult result = {false, vec3(0.0), vec3(0.0), {vec4(0.0), vec4(0.0), 0.0}};
 
     // Raycasting Logic
     vec3 pos = floor(ray.origin);
@@ -243,6 +266,9 @@ RaycastResult Raycast(Ray ray){
             }
         }
 
+        // Update the rays position so that the bounding box check works correctly
+        ray.origin = pos;
+
         // Check if there is a voxel at the position
         if(IsVoxelAt(int(pos.x), int(pos.y), int(pos.z))){
 
@@ -250,7 +276,9 @@ RaycastResult Raycast(Ray ray){
             Voxel vox = GetVoxelAt(int(pos.x), int(pos.y), int(pos.z));
 
             // Set the results data
-            result.colour = vec4(vox.type / 255.0, vox.type / 255.0, vox.type / 255.0, 1);
+            result.voxelProperties.colour = vec4(voxel_types[vox.type].r, voxel_types[vox.type].g, voxel_types[vox.type].b, 1);
+            result.voxelProperties.emission = vec4(voxel_types[vox.type].emission_r, voxel_types[vox.type].emission_g, voxel_types[vox.type].emission_b, 1);
+            result.voxelProperties.emission_strength = voxel_types[vox.type].emission_strength;
             result.hit = true;
             result.position = pos;
             result.normal = norm;
@@ -259,46 +287,6 @@ RaycastResult Raycast(Ray ray){
     }
 
     return result;
-}
-
-vec4 AmbientLighting(vec4 voxelColour){
-
-    vec4 outColour = voxelColour;
-
-    // Find all the ambient lights and apply the lighting
-    for(int i = 0; i < worldSettings[0].numberOfLights; i++){
-
-        if(lights[i].ambient){
-
-            // Get a reference to the ambient light
-            Light ambientLight = lights[i];
-
-            // Apply ambient light
-            outColour *= vec4(ambientLight.r * ambientLight.intensity, ambientLight.g * ambientLight.intensity, ambientLight.b * ambientLight.intensity, 1.0);
-        }
-    }
-
-    return outColour;
-}
-
-vec4 AmbientLighting(){
-
-    vec4 outColour = vec4(1.0);
-
-    // Find all the ambient lights and apply the lighting
-    for(int i = 0; i < worldSettings[0].numberOfLights; i++){
-
-        if(lights[i].ambient){
-
-            // Get a reference to the ambient light
-            Light ambientLight = lights[i];
-
-            // Apply ambient light
-            outColour *= vec4(ambientLight.r * ambientLight.intensity, ambientLight.g * ambientLight.intensity, ambientLight.b * ambientLight.intensity, 1.0);
-        }
-    }
-
-    return outColour;
 }
 
 // https://www.youtube.com/watch?v=Qz0KTGYJtUk&t=370s&ab_channel=SebastianLague
@@ -313,7 +301,7 @@ float RandomValue(in out uint state, float lower, float upper){
 
     // update state and calculate the regular RandomValue();
     float unmappedNumber = RandomValue(state);
-    float mappedState = (unmappedNumber - 0.0) * ((upper - lower)/(1.0 - 0.0)) + lower;
+    float mappedState = unmappedNumber * upper - lower + lower;
     return mappedState;
 }
 
@@ -342,26 +330,103 @@ vec3 RandomDirection(in out uint state, vec3 normal, float min, float max){
     direction.z = RandomValue(state, min, max);
 
     // Return the normalized vector of these ranges
-    return direction * sign(dot(normal, direction));
+    return normalize(direction);
 }
 
-LightHit CheckLightCollision(Ray ray){
+LightHit DirectLighting(Ray ray){
 
     // The return object of the function
-    LightHit lh = {false, vec4(0.0)};
+    LightHit lh = {false, vec4(1.0)};
+
+    // Loop through all the lights in the scene and use them to calculate lighting data
+    for(int i = 0; i < worldSettings[0].numberOfLights; i++){
+
+        // Check for all non-ambient lights
+        if(lights[i].type == 1){ // Directional Lights: light that just has a direction and unlimited range i.e. the sun
+
+            // Get a reference to the directional light
+            Light dirLight = lights[i];
+
+            // TODO: Need to cast a ray towards the directional light and then apply lighting if not contact
+
+            // Reverse the lights direction vector
+            ray.direction = -1 * vec3(dirLight.dirX, dirLight.dirY, dirLight.dirZ);
+
+            // Perform a raycast with the updated ray
+            RaycastResult result = Raycast(ray);
+            if(!result.hit){
+
+                // If the raycast does not hit then we should be lighting this voxel
+                lh.hit = true;
+                lh.colour += vec4(0.2);
+            }
+
+        }else if(lights[i].type == 2){ // Point Lights
+
+
+        }else if(lights[i].type == 3){ // Spot Lights
+
+
+        }
+    }
+
+    return lh;
+}
+
+// All lighting that is not from voxel emissions nor ambient
+LightHit EnvironmentLighting(Ray ray){
+
+    // The return object of the function
+    LightHit lh = {false, vec4(1.0)};
+
+    // Loop through all the lights in the scene and use them to calculate lighting data
+    for (int i = 0; i < worldSettings[0].numberOfLights; i++) {
+
+        // Check for all non-ambient lights
+        if (lights[i].type == 1) { // Directional Lights: light that just has a direction and unlimited range (e.g., the sun)
+
+            // Get a reference to the directional light
+            Light dirLight = lights[i];
+
+            float dotProduct = dot(normalize(ray.direction), -normalize(vec3(dirLight.dirX, dirLight.dirY, dirLight.dirZ)));
+
+            // Calculate Lambertian shading
+            //float lightIntensity = dot(normalize(ray.direction), normalize(-vec3(dirLight.dirX, dirLight.dirY, dirLight.dirZ)));
+            //lightIntensity = max(0.0, lightIntensity);
+
+            //// Apply directional light
+            lh.hit = true;
+            lh.colour = vec4(dotProduct);
+            //lh.colour *= lightIntensity * dirLight.intensity * vec4(dirLight.r, dirLight.g, dirLight.b, 1.0);
+
+        } else if (lights[i].type == 2) { // Point Lights
+            // TODO: Implement point lights
+        } else if (lights[i].type == 3) { // Spot Lights
+            // TODO: Implement spot lights
+        }
+    }
+
+    return lh;
+}
+
+// All ambient lighting in the scene is added to the original voxel here
+LightHit AmbientLighting(){
+
+    // The return object of the function
+    LightHit lh = {false, vec4(1.0)};
 
     // Loop through all the lights in the scene and use them to calculate lighting data
     for(int i = 0; i < worldSettings[0].numberOfLights; i++){
 
         // Find all the ambient lights and apply the lighting
-        if(lights[i].ambient){
+        if(lights[i].type == 0){
 
             // Get a reference to the ambient light
             Light ambientLight = lights[i];
 
             // Apply ambient light
             lh.hit = true;
-            lh.colour *= vec4(ambientLight.r, ambientLight.g, ambientLight.b, 1.0);
+            lh.colour *= ambientLight.intensity * vec4(ambientLight.r, ambientLight.g, ambientLight.b, 1.0);
         }
     }
 
@@ -370,12 +435,15 @@ LightHit CheckLightCollision(Ray ray){
 
 vec4 Raytrace(in out uint state, Ray ray){
 
+    vec4 envlight = vec4(0.0);
+    vec4 direction = vec4(0.0);
     vec4 incomingLight = {0,0,0,0};
     vec4 rayColour = {1,1,1,1};
 
+    // Since the ray hit a voxel we will now bounce the light ray off of it and any subsequently hit voxels
     for(int i = 0; i < lightingSettings[0].maxBounces; i++){
 
-        // Run the Raycast function to see if this ray will hit a voxel
+        // Run the Raycast function to see if this ray will hit another voxel
         RaycastResult result = Raycast(ray);
         if(result.hit){
 
@@ -383,19 +451,28 @@ vec4 Raytrace(in out uint state, Ray ray){
             ray.origin = result.position;
 
             // Update the rays direction to be a random direction out from the rays normal direction
-            ray.direction = RandomDirection(state, result.normal, -1.0, 1.0);
+            ray.direction = normalize(result.normal + RandomDirection(state, result.normal, -1.0, 1.0));
+
+            // Calculate the emmited light
+            vec4 emittedLight = result.voxelProperties.emission * result.voxelProperties.emission_strength;
 
             // Update incoming light
-            incomingLight += AmbientLighting() * rayColour;
+            incomingLight += emittedLight * rayColour;
 
             // Update the rays colour
-            rayColour *= result.colour;
+            rayColour *= result.voxelProperties.colour;
         }else{
 
+            incomingLight += EnvironmentLighting(ray).colour * rayColour;
+            envlight = EnvironmentLighting(ray).colour;
+            direction = vec4(vec3(ray.direction), 1.0);
             break;
         }
     }
 
+    //return direction;
+    //return envlight;
+    // return rayColour;
     return incomingLight;
 }
 
@@ -435,26 +512,8 @@ void main() {
     // Make the ray
     Ray ray = {ray_o, ray_d};
 
-    // TODO: Should be able to just call raytrace instead of Raycast then raytrace
     vec4 light = Raytrace(state, ray);
     pixel = light;
-
-    // Run the Raycasting algorithm to check whether a ray will intersect a voxel
-    /* RaycastResult rayResult = Raycast(ray);
-    if(rayResult.hit){
-
-        vec4 voxelColour = rayResult.colour;
-
-        vec4 lighting = Raytrace(state, ray);
-
-        // Apply ambient lighting
-        //voxelColour = AmbientLighting(voxelColour);
-        //voxelColour = vec4(rayResult.normal * 0.5 + 0.5, 1); // Debug Normals
-        voxelColour = vec4(RandomDirection(state, rayResult.normal, -1.0, 1.0), 1);
-
-        // Set the pixel to be the calculated voxel colour
-        pixel = voxelColour;
-    }*/
 
     imageStore(screen, pixel_coords, pixel);
 }
