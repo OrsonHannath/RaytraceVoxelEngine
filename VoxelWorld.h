@@ -21,8 +21,11 @@
 
 class VoxelWorld {
 private:
-    VoxelTypeInformation* voxelTypeInformation;
+    // Simplex noise generator
     SimplexNoise* simplexNoise;
+
+    // Voxel Type Information Object
+    VoxelTypeInformation* voxelTypeInformation;
 
     // The number of chunks viewed in the world;
     int renderDistance = 2;

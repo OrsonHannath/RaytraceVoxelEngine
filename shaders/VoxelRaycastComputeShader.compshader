@@ -388,16 +388,13 @@ LightHit EnvironmentLighting(Ray ray){
             // Get a reference to the directional light
             Light dirLight = lights[i];
 
-            float dotProduct = dot(normalize(ray.direction), -normalize(vec3(dirLight.dirX, dirLight.dirY, dirLight.dirZ)));
-
             // Calculate Lambertian shading
-            //float lightIntensity = dot(normalize(ray.direction), normalize(-vec3(dirLight.dirX, dirLight.dirY, dirLight.dirZ)));
-            //lightIntensity = max(0.0, lightIntensity);
+            float lightIntensity = dot(normalize(ray.direction), normalize(-vec3(dirLight.dirX, dirLight.dirY, dirLight.dirZ)));
+            lightIntensity = max(0.0, lightIntensity);
 
             //// Apply directional light
             lh.hit = true;
-            lh.colour = vec4(dotProduct);
-            //lh.colour *= lightIntensity * dirLight.intensity * vec4(dirLight.r, dirLight.g, dirLight.b, 1.0);
+            lh.colour *= lightIntensity * dirLight.intensity * vec4(dirLight.r, dirLight.g, dirLight.b, 1.0);
 
         } else if (lights[i].type == 2) { // Point Lights
             // TODO: Implement point lights
@@ -464,8 +461,6 @@ vec4 Raytrace(in out uint state, Ray ray){
         }else{
 
             incomingLight += EnvironmentLighting(ray).colour * rayColour;
-            envlight = EnvironmentLighting(ray).colour;
-            direction = vec4(vec3(ray.direction), 1.0);
             break;
         }
     }

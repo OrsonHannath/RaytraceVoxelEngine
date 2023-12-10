@@ -4,12 +4,12 @@
 
 #include "VoxelTypeInformation.h"
 
-VoxelTypeInformation::VoxelTypeInformation() {
+VoxelTypeInformation::VoxelTypeInformation(int numberOfTypes_) {
 
-
+    numberOfTypes = numberOfTypes_;
 }
 
-std::vector<VoxelType> VoxelTypeInformation::GetVoxelTypeInformation(int numberOfTypes) {
+std::vector<VoxelType> VoxelTypeInformation::GetVoxelTypeInformation() {
 
     std::vector<VoxelType> voxTypes;
     for(int i = 0; i < numberOfTypes; i++){
@@ -20,7 +20,7 @@ std::vector<VoxelType> VoxelTypeInformation::GetVoxelTypeInformation(int numberO
 
     for(int i = 0; i < voxelTypes.size(); i++){
 
-        VoxelType vt = voxTypes.at(i);
+        VoxelType vt = voxelTypes.at(i);
         voxTypes.at(vt.type) = vt;
     }
 
@@ -29,5 +29,5 @@ std::vector<VoxelType> VoxelTypeInformation::GetVoxelTypeInformation(int numberO
 
 void VoxelTypeInformation::AddVoxelType(VoxelType vt_) {
 
-
+    voxelTypes.push_back(vt_);
 }

@@ -14,10 +14,11 @@
 
 class VoxelTypeInformation {
 public:
-    VoxelTypeInformation();
+    int numberOfTypes = 0;
+    VoxelTypeInformation(int numberOfTypes_);
     virtual void AddVoxelType(VoxelType vt_);
-    virtual std::vector<VoxelType> GetVoxelTypeInformation(int numberOfTypes);
-private:
+    virtual std::vector<VoxelType> GetVoxelTypeInformation();
+protected:
     std::vector<VoxelType> voxelTypes;
 };
 

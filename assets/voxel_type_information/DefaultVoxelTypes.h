@@ -9,7 +9,8 @@
 
 class DefaultVoxelTypes : public VoxelTypeInformation {
 public:
-    DefaultVoxelTypes();
+    DefaultVoxelTypes(int numberOfTypes);
+    void CompileVoxelTypes();
 };
 
 

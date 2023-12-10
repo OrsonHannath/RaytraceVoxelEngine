@@ -22,6 +22,9 @@ VoxelWorld::VoxelWorld() {
     voxelIndices = new int[TotalVoxels()]{-1};
     std::cout << "Initialized Voxel Indices Array" << std::endl;
 
+    // Load the voxel types information
+    voxelTypeInformation = new DefaultVoxelTypes(9);
+
     // Instantiate the Voxel World using the SimplexNoise
     double voxelInitStartTime = CurrentTime();
     for(int x = 0; x < TotalWorldSize(); x++){
@@ -29,7 +32,7 @@ VoxelWorld::VoxelWorld() {
             for(int z = 0; z < TotalWorldSize(); z++){
 
                 // Determine the voxels type using the simplex noise
-                int voxelType = (int)roundf(simplexNoise->fractal(1, x, y, z) * 255);
+                int voxelType = (int)roundf(simplexNoise->fractal(1, x, y, z) * voxelTypeInformation->numberOfTypes);
 
                 // Create the voxel structure and add it to the voxels vector
                 Voxel voxel = {voxelType};
@@ -40,9 +43,6 @@ VoxelWorld::VoxelWorld() {
             }
         }
     }
-
-    // Load the voxel types information
-    voxelTypeInformation = new DefaultVoxelTypes();
 
     updateVoxels = true;
     std::cout << "Initialized Voxel World Vector in: " << DeltaTime(voxelInitStartTime) << " seconds" << std::endl;
@@ -159,7 +159,7 @@ void VoxelWorld::UpdateVoxelTypeDataBuffer() {
         std::cout << "Updating Voxel Type Information Buffer" << std::endl;
 
         // Get the voxel type information
-        std::vector<VoxelType> voxelTypes = voxelTypeInformation->GetVoxelTypeInformation(256);
+        std::vector<VoxelType> voxelTypes = voxelTypeInformation->GetVoxelTypeInformation();
 
         // Delete the buffers before updating them to avoid memory leakage
         glDeleteBuffers(1, &voxelTypeDataBuffer);

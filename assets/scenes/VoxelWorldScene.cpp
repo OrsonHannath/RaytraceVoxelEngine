@@ -19,7 +19,7 @@ VoxelWorldScene::VoxelWorldScene(std::string name, GLFWwindow* window_, std::map
     voxelWorld->AddLight(ambientLight);
 
     // Create a directional light
-    Light directionalLight = Light(1, 1, fVec3(0, 0, 0), fVec3(-1, -1, -1), fVec3(1.0, 1.0, 1.0), 2.0);
+    Light directionalLight = Light(1, 1, fVec3(0, 0, 0), fVec3(-1, -1, -1), fVec3(1.0, 1.0, 1.0), 1.0);
     voxelWorld->AddLight(directionalLight);
 }
 
